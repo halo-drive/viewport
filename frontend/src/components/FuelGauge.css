@@ -1,0 +1,12 @@
+.fuel-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.fuel-gauge svg {
+  display: block; /* Prevents extra space below */
+  margin: 0;
+  padding: 0;
+}

@@ -1,0 +1,197 @@
+/* Energy Panel Styles */
+.energy-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Reduced from 15px */
+    width: 100%;
+    
+  }
+  
+  /* Specific height for the energy pane */
+  .energy-pane {
+    height: 520px !important; /* Adjusted from 520px */
+  }
+  
+  .energy-section {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 10px; /* Reduced from 12px */
+    padding: 10px; /* Reduced from 12px */
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .section-title {
+    font-size: 15px; /* Reduced from 18px */
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 12px; /* Reduced from 15px */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 6px; /* Reduced from 8px */
+    overflow: hidden;
+  }
+  
+  /* Fuel Type Selection Buttons */
+  .fuel-type-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .fuel-btn {
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .fuel-btn.active {
+    background-color: #00f8ec75;
+    border-color: transparent;
+    color: #333;
+    font-weight: 600;
+  }
+  
+  /* Fuel Display */
+  .fuel-display {
+    display: flex;
+    align-items: center;
+    gap: 12px; /* Reduced from 15px */
+    background-color: #f5f5f5a8;
+    padding: 10px; /* Reduced from 12px */
+    border-radius: 5px; /* Reduced from 6px */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .fuel-icon-container {
+    width: 34px; /* Reduced from 40px */
+    display: flex;
+    justify-content: center;
+  }
+  
+  .fuel-icon {
+    width: 27px; /* Reduced from 32px */
+    height: 27px; /* Reduced from 32px */
+    object-fit: contain;
+  }
+  
+  .fuel-bar-container {
+    flex-grow: 1;
+    height: 17px; /* Reduced from 20px */
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 5px; /* Reduced from 6px */
+    overflow: hidden;
+  }
+  
+  .fuel-bar-fill {
+    height: 100%;
+    border-radius: 5px; /* Reduced from 6px */
+    transition: width 1s ease, background-color 1s ease;
+  }
+  
+  .fuel-value {
+    width: 70px; /* Reduced from 80px */
+    text-align: right;
+    font-weight: 600;
+    font-size: 16px; /* Added font-size reduction */
+    color: #2c3e50;
+  }
+  
+  /* Station Display */
+  .station-display {
+    background-color: #f5f5f5a8;
+    padding: 12px; /* Reduced from 15px */
+    border-radius: 5px; /* Reduced from 6px */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    color: #444;
+  }
+  
+  .station-name {
+    font-size: 15px; /* Reduced from 16px */
+    font-weight: 700;
+    margin-bottom: 10px; /* Reduced from 12px */
+    padding-bottom: 5px; /* Reduced from 6px */
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+    color: #0a335c;
+  }
+  
+  /* Filling Points Display */
+  .filling-points {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filling-points-row {
+    display: flex;
+    justify-content: space-around;
+    gap: 10px;
+  }
+  
+  .filling-point-icon {
+    width: 30px;
+    height: 30px;
+    /* border-radius: 50%; */
+    object-fit: cover;
+    transition: transform 0.2s;
+  }
+  
+  .filling-point-icon:hover {
+    transform: scale(1.1);
+  }
+  
+  .filling-status {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  
+  .available-count {
+    color: #2ecc71;
+    font-weight: 600;
+  }
+  
+  .occupied-count {
+    color: #e74c3c;
+    font-weight: 600;
+  }
+  
+  /* Update filling-points-row to match other elements */
+  .filling-points-row {
+    display: flex;
+    justify-content: space-around;
+    gap: 10px;
+    padding: 8px 0;
+  }
+  
+  /* Hydrogen Station Details */
+  .hydrogen-station-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 8px; /* Reduced from 12px 10px */
+    margin-bottom: 6px; /* Reduced from 8px */
+    background-color: #f5f5f5a8;
+    border-radius: 5px; /* Reduced from 6px */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .detail-label {
+    font-weight: 500;
+    color: #444;
+    font-size: 12px; /* Added font size reduction */
+    color: #2c3e50;
+  }
+  
+  .detail-value {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px; /* Added font size reduction */
+  }

@@ -1,0 +1,626 @@
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+#root {
+  height: 100vh;
+  font-family: "Inter", sans-serif;
+}
+
+.leaflet-container{
+  height: 100vh;
+}
+
+.leaflet-control-attribution.leaflet-control {
+  display: none;
+}
+
+.cluster-icon {
+  height: 3rem;
+  width: 3rem;
+  border-radius: 50%;
+  background-color: #fff;
+  transform: translate(-25%, -25%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 900;
+  font-size: 1.5rem;
+}
+
+.left-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* background-color: rgba(71, 2, 73, 0.281); */
+  padding: 10px;
+  border-radius: 60px;
+  border: 1px ridge rgba(0, 0, 0, 0.253);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  width: 80px;
+  background-image: linear-gradient(to bottom, #e6646457, #9198e5ce);
+  /* backdrop-filter: blur(2px); */
+}
+
+.bar-button {
+  padding: 20px 15px;
+  margin: 5px 0;
+  border: none; 
+  border-radius: 3px;
+  background-color: transparent;
+  cursor: pointer;
+  width: 100px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bar-button:hover {
+  transform: scale(1.3);
+  transition: transform 0.3s ease;
+}
+
+.button-logo {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 5px;
+}
+
+.button-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  
+}
+
+.bar-button:hover .button-label {
+  color: rgba(0, 0, 0, 0.664);
+}
+
+/* Analytics Chart Styles */
+.analytics-chart {
+  margin-top: 15px;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.bar-label {
+  width: 150px;
+  font-size: 14px;
+  text-align: right;
+  padding-right: 10px;
+}
+
+.bar-container {
+  flex-grow: 1;
+  height: 18px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  height: 100%;
+  background-color: #4e7aff;
+  width: 0%; /* Start empty */
+  transition: width 1s ease-out;
+  border-radius: 3px;
+}
+
+.bar-value {
+  width: 40px;
+  font-size: 14px;
+  text-align: right;
+  padding-left: 10px;
+}
+
+/* Sliding Pane Styles */
+
+.sliding-pane {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 90px; /* Position right next to the left bar */
+  height: 400px; /* Same height as the left bar */
+  width: 300px;
+  background-image: linear-gradient(to bottom, #e6646457, #9198e5ce);
+  border-radius: 0 60px 60px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 999;
+  overflow: hidden;
+  animation: slideIn 0.4s ease-in-out forwards;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+.pane-header {
+  padding: 15px;
+  background-image: linear-gradient(to bottom right, #e6646457, #9198e5ce);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.pane-header h1 {
+  margin: 0;
+  color: #fff;
+  text-transform: capitalize;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.pane-content {
+  padding: 20px;
+  height: calc(100% - 50px);
+  overflow-y: auto;
+  color: #fff;
+  font-weight: 900;
+}
+
+.analytics-pane {
+  width: 400px;
+}
+.analytics-header {
+  font-size: 14px;
+  color: rgb(11, 37, 4);
+}
+
+/* Bar Chart Color Classes */
+.bar-color-1 { background-color: #4e7aff; } 
+.bar-color-2 { background-color: #ff6b6b; } 
+.bar-color-3 { background-color: #4ecdc4; } 
+.bar-color-4 { background-color: #ffbe0b; } 
+.bar-color-5 { background-color: #8a2be2; } 
+.bar-color-6 { background-color: #3cb44b; } 
+.bar-color-7 { background-color: #f58231; } 
+.bar-color-8 { background-color: #e6194c; } 
+
+/* Cost Pane Styles */
+.cost-container {
+  padding: 10px 0;
+}
+
+.cost-container h4 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.cost-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;  /* This was added */
+  padding: 12px 10px;
+  margin-bottom: 10px;
+  background-color: #f5f5f5a8;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cost-label {
+  font-weight: 500;
+  color: #444;
+  flex: 1;  /* This was added */
+}
+
+.cost-value {
+  font-weight: 600;
+  color: #2c3e50;
+  flex: 0 0 auto;  /* This was added */
+}
+
+.cost-icon {
+  width: 24px;
+  height: 24px;
+  margin: 0 10px;
+}
+
+/* Journey Pane Styles */
+.journey-container {
+  padding: 10px 0;
+}
+
+.journey-container h4 {
+  margin-bottom: 15px;
+  color: #333;
+  overflow: hidden;
+}
+
+.journey-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 10px;
+  margin-bottom: 10px;
+  background-color: #f5f5f5a8;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.journey-label {
+  font-weight: 500;
+  color: #444;
+  flex: 1;
+}
+
+.journey-icon {
+  width: 24px;
+  height: 24px;
+  margin: 0 10px;
+}
+
+.journey-value {
+  font-weight: 600;
+  color: #2c3e50;
+  flex: 0 0 auto;
+}
+
+/* Fleet Pane Styles */
+.fleet-container {
+  padding: 10px 0;
+}
+
+.fleet-container h4 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.fleet-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 10px;
+  margin-bottom: 10px;
+  background-color: #f5f5f5a8;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.fleet-label {
+  font-weight: 500;
+  color: #444;
+  flex: 1;
+}
+
+.fleet-icon {
+  width: 24px;
+  height: 24px;
+  margin: 0 10px;
+}
+
+.fleet-value {
+  font-weight: 600;
+  color: #2c3e50;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.status-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Start Form Styles */
+.start-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 550px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: white;
+}
+
+.form-group input,
+.form-group select {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.fuel-type-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.fuel-btn {
+  padding: 8px 15px;
+  border: 1px solid #ddd;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fuel-btn.active {
+  background-color: #00f8ec75;
+  border-color: transparent;
+  color: #333;
+  font-weight: 600;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.submit-btn, .reset-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.2s;
+}
+
+.submit-btn {
+  background-color: #08faee;
+  color: #333;
+}
+
+.reset-btn {
+  background-color: #f5f5f5;
+  color: #555;
+}
+
+.submit-btn:hover, .reset-btn:hover {
+  transform: scale(1.05);
+}
+
+/* .start-journey-button:hover {
+  transform: scale(1.05);
+} */
+
+/* Special dimensions for start pane */
+.start-pane {
+  width: 380px;
+  height: 650px;
+  border-radius: 30px 60px 60px 30px;
+  background-color: white;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.fuel-btn:focus {
+  outline: none;
+  border-color: #ddd; /* Same as the default border color */
+  box-shadow: none;
+}
+
+/* Custom scrollbar for journey form */
+.start-form::-webkit-scrollbar {
+  width: 8px;
+}
+
+.start-form::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.start-form::-webkit-scrollbar-thumb {
+  background-color: #0c468871;
+  border-radius: 10px;
+}
+
+.start-form::-webkit-scrollbar-thumb:hover {
+  background-color: #43484e71;
+}
+
+/* Floating Cards Styles */
+.floating-cards-container {
+  position: absolute;
+  top: 20px;
+  left: 60%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 15px;
+  z-index: 500;
+  width: auto;
+  /* display: none; */
+}
+
+.floating-card {
+  background: rgba(255, 255, 255, 0.233);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  backdrop-filter: blur(5px);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.floating-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.card-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.card-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.card-content {
+  text-align: center;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 12px;
+  color: #001437;
+  font-weight: 600;
+}
+
+.card-value {
+  margin: 5px 0 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #000f29;
+}
+
+/* Logo on map */
+.map-logo {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.map-logo img {
+  width: 80px;
+  height: auto;
+  opacity: 0.5;
+  /* filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)); */
+}
+
+/*to disable the buttons*/
+.disabled-button {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+.disabled-button:hover {
+  transform: none !important;
+}
+
+/* Route display styles */
+.custom-marker-icon {
+  background-color: white;
+  border: 3px solid #6f42c1;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: #6f42c1;
+  width: 30px !important;
+  height: 30px !important;
+  margin-top: -15px !important;
+  margin-left: -15px !important;
+}
+
+/* Hide the instruction lists from the routing control */
+.leaflet-routing-container {
+  display: none !important;
+}
+
+/* Style for highlighting the active route */
+.leaflet-routing-alt {
+  display: none !important;
+}
+
+/* Style for making route visible */
+.leaflet-routing-line {
+  opacity: 0.9;
+}
+
+/* Styles for when journey is active in Start pane */
+.journey-active-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+  height: 100%;
+}
+
+.journey-active-container h3 {
+  font-size: 20px;
+  color: white;
+  margin-bottom: 15px;
+}
+
+.journey-active-container p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.journey-active-container .reset-btn {
+  background-color: #08faee;
+  color: #333;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.2s;
+}
+
+.journey-active-container .reset-btn:hover {
+  transform: scale(1.05);
+}
+
+.logout-btn {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.logout-btn:hover {
+  background-color: #d32f2f;
+}
+
+.form-buttons {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 20px;
+}
+
+.pane-content{
+  overflow: hidden;
+}
+
