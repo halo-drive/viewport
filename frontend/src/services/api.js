@@ -1,5 +1,4 @@
-// Base API URL - change this to your Flask backend URL
-const API_BASE_URL = 'http://localhost:443';
+const API_BASE_URL = '';
 
 // Generic API request handler
 async function apiRequest(url, method = 'GET', data = null) {

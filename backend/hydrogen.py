@@ -18,6 +18,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from hydrogen_here_map import getdatah
+from config import Config
 
 
 # In[6]:
@@ -34,9 +35,8 @@ DATE_FORMAT = "%Y-%m-%d"
 
 
 mapbox_token = "pk.eyJ1IjoiY2hlc2hpcmV0ZWNoIiwiYSI6ImNsdWppd2xuMTBja3cya2w1dmd5N2pybXkifQ.gPKzd8EEX8DTwmO0oBRQ1Q"
-# weather_api_key = "f82511f3a0934ec8b7790510243003"
-weather_api_key = "c6b99eb5ae4943a2a85140655250104"
-geocoding_api = "66053a1a9d7ef949143373sibb51465"
+weather_api_key = Config.WEATHER_API_KEY
+geocoding_api = Config.GEOCODING_API_KEY
 
 
 # In[8]:

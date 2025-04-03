@@ -1,0 +1,24 @@
+# Environment variables
+.env
+backend/.env
+frontend/.env
+
+# Python virtual environment
+backend/venv/
+
+# Node modules
+frontend/node_modules/
+
+# Frontend build output
+frontend/dist/  # Or frontend/build/ - use your actual build output folder name
+frontend/.vite/ # If using Vite
+
+# Database file (optional - decide if you want to commit the initial DB)
+# users.db
+# backend/users.db
+
+# IDE / OS specific
+.vscode/
+__pycache__/
+*.pyc
+.DS_Store

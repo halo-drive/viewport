@@ -9,6 +9,7 @@ import requests
 from geopy.distance import geodesic
 from typing import Tuple, List
 from collections import namedtuple
+from config import Config
 
 FORMAT_VERSION = 1
 
@@ -18,6 +19,8 @@ DECODING_TABLE = [
     22, 23, 24, 25, -1, -1, -1, -1, 63, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
     36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
 ]
+
+api_key = Config.API_KEY
 
 PolylineHeader = namedtuple('PolylineHeader', 'precision,third_dim,third_dim_precision')
 
@@ -201,7 +204,7 @@ def display_route_on_map(route_coordinates, fuel_station_coords, origin_city, de
     return route_map
 
 def launch_all(origin_city, destination_city):
-    api_key = "PGQ79WQSjN1KIbgRY_LdG9O1WlQ1WinCp7hhCY_IMbw"  # Replace with your API key
+
     route_coords, route_points, fuel_station_coords = get_route_with_fuel_stations(
         api_key, origin_city=origin_city, destination_city=destination_city
     )
