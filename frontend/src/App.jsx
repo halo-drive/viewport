@@ -7,7 +7,7 @@ import Login from "./components/Login";
 import AdminDashboard from "./components/AdminDashboard";
 import { AppContext } from "./AppContext";
 import { AuthContext } from "./AuthContext";
-import LeftBar from "./components/leftBar";
+import LeftBar from "./components/LeftBar";
 import FloatingCards from "./components/FloatingCards";
 import RouteDisplay from "./components/RouteDisplay";
 import Loading from "./components/Loading";
