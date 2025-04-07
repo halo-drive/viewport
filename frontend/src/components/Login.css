@@ -1,178 +1,217 @@
-/* Start Global rules */
-.login-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    
-    
-    background-image: linear-gradient(to top, #e6646457, #9198e5ce);
-    background-attachment: fixed;
-    background-repeat: no-repeat;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-  }
-  
-  .error-message {
-    color: #ff3333;
-    text-align: center;
-    margin-bottom: 10px;
-    font-weight: bold;
-  }
-  
-  /* Start form attributes */
-  .login-overlay form {
-    width: 450px;
-    min-height: 500px;
-    height: auto;
-    border-radius: 5px;
-    margin: 2% auto;
-    box-shadow: 0 9px 50px hsla(20, 67%, 75%, 0.31);
-    padding: 2%;
-    background-image: linear-gradient(224deg, #d6f0b48c 50%, #734abece 50%);
-    font-family: 'Inter', sans-serif;
-  }
-  
-  /* form Container */
-  .login-overlay form .con {
-    display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
-    margin: 0 auto;
-  }
-  
-  /* the header form form */
-  .login-overlay header {
-    margin: 2% auto 10% auto;
-    text-align: center;
-  }
-  
-  /* Login title form form */
-  .login-overlay header h2 {
-    font-size: 250%;
-    font-family: 'Inter', sans-serif;
-    font-weight: bold;
-    color: #3e403f;
-  }
-  
-  /* A welcome message or an explanation of the login form */
-  .login-overlay header p {
-    letter-spacing: 0.05em;
-  }
-  
-  /* .login-overlay .input-item {
-    background: #fff;
-    color: #333;
-    padding: 14.5px 0px 15px 9px;
-    border-radius: 5px 0px 0px 5px;
-  } */
+/* Modern Login/Signup UI - New Design */
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden; /* Prevents map from creating scrollbars */
+}
 
-  .login-overlay .input-item {
-    background: #fff;
-    color: #333;
-    padding: 15.5px 0px 15px 9px; /* Changed from 14.5px 0px 15px 9px */
-    border-radius: 5px 0px 0px 5px;
-  }
-  
-  /* Show/hide password Font Icon */
-  .login-overlay #eye {
-    background: #fff;
-    color: #333;
-    margin: 5.9px 0 0 0;
-    margin-left: -20px;
-    padding: 15px 9px 19px 0px;
-    border-radius: 0px 5px 5px 0px;
-    float: right;
-    position: relative;
-    right: 1%;
-    top: -.2%;
-    z-index: 5;
-    cursor: pointer;
-  }
-  
-  /* inputs form */
-  .login-overlay input[class="form-input"] {
-    width: 240px;
-    height: 50px;
-    margin-top: 2%;
-    padding: 15px;
-    font-size: 16px;
-    font-family: 'Inter', sans-serif;
-    color: #5E6472;
-    outline: none;
-    border: none;
-    border-radius: 0px 5px 5px 0px;
-    transition: 0.2s linear;
-  }
-  
-  .login-overlay input[id="txt-input"] {
-    width: 250px;
-  }
-  
-  /* focus */
-  .login-overlay input:focus {
-    transform: translateX(-2px);
-    border-radius: 5px;
-  }
-  
-  /* buttons */
-  .login-overlay button {
-    display: inline-block;
-    color: #252537;
-    width: 280px;
-    height: 50px;
-    padding: 0 20px;
-    background: #fff;
-    border-radius: 5px;
-    outline: none;
-    border: none;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.2s linear;
-    margin: 7% auto;
-    letter-spacing: 0.05em;
-    font-family: 'Inter', sans-serif;
-  }
-  
-  /* Submits */
-  .login-overlay .submits {
-    width: 48%;
-    display: inline-block;
-    float: left;
-    margin-left: 2%;
-  }
-  
-  /* Forgot Password button */
-  .login-overlay .frgt-pass {
-    background: transparent;
-  }
-  
-  /* Sign Up button */
-  .login-overlay .sign-up {
-    background: #b6e776c4;
-  }
-  
-  /* buttons hover */
-  .login-overlay button:hover {
-    transform: translatey(3px);
-    box-shadow: none;
-    animation: ani9 0.4s ease-in-out infinite alternate;
-  }
-  
-  @keyframes ani9 {
-    0% {
-      transform: translateY(3px);
-    }
-    100% {
-      transform: translateY(5px);
-    }
-  }
+/* Map container styling */
+.map-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+}
 
-  .login-overlay .login-logo {
-    width: 120px;
-    height: auto;
-    margin-bottom: 15px;
-  }
+/* Overlay gradient on top of map */
+.overlay-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(69, 69, 211, 0.171);
+  z-index: -1;
+}
+
+.login-card {
+  width: 400px;
+  background: rgba(255, 255, 255, 0.158);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+  backdrop-filter: blur(8px);
+  padding: 40px;
+  transition: all 0.3s ease;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-logo {
+  width: 140px;
+  height: auto;
+  margin-bottom: 15px;
+}
+
+.login-title {
+  font-size: 24px;
+  color: #333;
+  margin: 10px 0;
+  font-weight: 600;
+}
+
+.login-subtitle {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.form-group {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 15px 15px 15px 45px;
+  border: none;
+  background: #f7f7f7;
+  border-radius: 8px;
+  font-size: 15px;
+  color: #333;
+  transition: all 0.3s;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(107, 142, 251, 0.3);
+  outline: none;
+}
+
+.input-icon {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+  font-size: 16px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.password-toggle:hover {
+  color: #6b8efb;
+}
+
+.error-message {
+  background: rgba(255, 76, 76, 0.1);
+  color: #ff4c4c;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.primary-button {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 10px;
+}
+
+.primary-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 14px rgba(50, 50, 93, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+}
+
+.primary-button:active {
+  transform: translateY(1px);
+}
+
+.primary-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.secondary-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 25px;
+}
+
+.text-button {
+  background: transparent;
+  border: none;
+  font-weight: 700;
+  color: #1d357ebe;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  padding: 0;
+}
+
+.text-button:hover {
+  color: #a777e3;
+  text-decoration: underline;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 25px 0;
+  color: #888;
+}
+
+.separator::before,
+.separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.separator::before {
+  margin-right: 10px;
+}
+
+.separator::after {
+  margin-left: 10px;
+}
+
+/* Animation for transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-card {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.input-icon{
+  position: absolute;
+  left: 85%;
+}

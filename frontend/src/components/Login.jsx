@@ -1,7 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import './Login.css';
 import logoViolet from '../assets/logo-violet.png';
 import { AuthContext } from '../AuthContext';
+import 'leaflet/dist/leaflet.css';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -9,8 +10,91 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
+  const mapRef = useRef(null);
   
   const { login, signup, loading, error } = useContext(AuthContext);
+  
+  useEffect(() => {
+    // We need to dynamically import Leaflet because it requires window
+    const initMap = async () => {
+      // Only import leaflet on client-side
+      const L = await import('leaflet');
+      
+      // Initialize map if it doesn't exist yet
+      if (!mapRef.current) {
+        // London coordinates (starting point)
+        const londonCoordinates = [51.461883, -0.087581];
+        
+        // Create map centered on London with a lower zoom to show more area
+        const map = L.map('map-background', {
+          center: londonCoordinates,
+          zoom: 10,  // Lower zoom to show more of the UK
+          zoomControl: false,
+          attributionControl: false,
+          dragging: false,
+          scrollWheelZoom: false,
+          doubleClickZoom: false,
+          keyboard: false,
+          touchZoom: false
+        });
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        // Store map reference
+        mapRef.current = map;
+        
+        // Create a continuous panning effect that preloads tiles
+        // This uses Leaflet's own methods to ensure tiles are loaded properly
+        const panStep = () => {
+          const currentCenter = map.getCenter();
+          // Move consistently northward (up the UK)
+          const newLat = currentCenter.lat + 0.02; // Small increment for smooth movement
+          
+          // Ensure we're still showing map tiles (stay within UK northern limits)
+          if (newLat < 58.5) { // Northern tip of Scotland is around 58.5 latitude
+            // Pan to new location
+            map.panTo([newLat, currentCenter.lng], {
+              animate: true,
+              duration: 2.0, // Smooth animation over 2 seconds
+              easeLinearity: 1 // Linear movement (no acceleration/deceleration)
+            });
+            
+            // Schedule next pan after this one completes
+            setTimeout(panStep, 2100); // Slightly longer than animation duration
+          } else {
+            // We've reached northern Scotland, reset to London
+            // Use a quick fade out/in effect to hide the transition
+            document.getElementById('map-background').style.opacity = 0;
+            
+            setTimeout(() => {
+              map.panTo(londonCoordinates, { animate: false });
+              document.getElementById('map-background').style.opacity = 1;
+              
+              // Restart the movement
+              setTimeout(panStep, 500);
+            }, 1000);
+          }
+        };
+        
+        // Start the panning effect
+        panStep();
+      }
+    };
+    
+    initMap();
+    
+    // Clean up on unmount
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,93 +128,96 @@ export default function Login() {
   };
 
   return (
-    <div className="login-overlay">
-      <form onSubmit={handleSubmit}>
-        <div className="con">
-          <header className="head-form">
-            <img src={logoViolet} alt="Logo" className="login-logo" />
-            <p>A POMO Robotics Venture</p>
-          </header>
+    <div className="login-container">
+      <div id="map-background" className="map-container"></div>
+      <div className="overlay-gradient"></div>
+      <div className="login-card">
+        <div className="login-header">
+          <img src={logoViolet} alt="Logo" className="login-logo" />
+          <h1 className="login-title">{isSignup ? 'Create Account' : 'Welcome Back'}</h1>
+        </div>
+        
+        {error && <div className="error-message">{error}</div>}
+        
+        <form onSubmit={handleSubmit}>
+          {isSignup && (
+            <div className="form-group">
+              <i className="fa fa-user-circle input-icon"></i>
+              <input 
+                className="form-input" 
+                type="text" 
+                placeholder="Username" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required 
+              />
+            </div>
+          )}
           
-          {error && <div className="error-message">{error}</div>}
-          
-          <div className="field-set">
-            {isSignup && (
-              <>
-                <span className="input-item">
-                  <i className="fa fa-user-circle"></i>
-                </span>
-                <input 
-                  className="form-input" 
-                  id="txt-username" 
-                  type="text" 
-                  placeholder="Username" 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required 
-                />
-                <br />
-              </>
-            )}
-            
-            <span className="input-item">
-              <i className="fa fa-user-circle"></i>
-            </span>
+          <div className="form-group">
+            <i className="fa fa-envelope input-icon"></i>
             <input 
               className="form-input" 
-              id="txt-input" 
-              type="text" 
-              placeholder="Email" 
+              type="email" 
+              placeholder="Email Address" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required 
             />
-            
-            <br />
-            
-            <span className="input-item">
-              <i className="fa fa-key"></i>
-            </span>
+          </div>
+          
+          <div className="form-group">
+            <i className="fa fa-lock input-icon"></i>
             <input 
               className="form-input" 
               type={showPassword ? "text" : "password"} 
               placeholder="Password" 
-              id="pwd" 
-              name="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required 
             />
-            
-            <span>
-              <i 
-                className={`fa ${showPassword ? "fa-eye-slash" : "fa-eye"}`} 
-                aria-hidden="true" 
-                id="eye" 
-                onClick={togglePassword}
-              ></i>
-            </span>
-            
-            <br />
-            
-            <button type="submit" className="log-in" disabled={loading}> 
-              {loading ? (isSignup ? "Signing up..." : "Logging in...") : (isSignup ? "Sign Up" : "Log In")}
+            <button 
+              type="button" 
+              className="password-toggle" 
+              onClick={togglePassword}
+              tabIndex="-1"
+            >
+              <i className={`fa ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
             </button>
           </div>
           
-          <div className="other">
-            <button type="button" className="btn submits frgt-pass">Forgot Password</button>
+          <button 
+            type="submit" 
+            className="primary-button" 
+            disabled={loading}
+          >
+            {loading 
+              ? (isSignup ? "Creating Account..." : "Signing In...") 
+              : (isSignup ? "Sign Up" : "Sign In")
+            }
+          </button>
+          
+          <div className="secondary-actions">
+            {!isSignup && (
+              <button type="button" className="text-button">
+                Forgot Password?
+              </button>
+            )}
             <button 
               type="button" 
-              className="btn submits sign-up"
-              onClick={() => setIsSignup(!isSignup)}
+              className="text-button"
+              onClick={() => {
+                setIsSignup(!isSignup);
+                setUsername('');
+                setEmail('');
+                setPassword('');
+              }}
             >
-              {isSignup ? "Back to Login" : "Sign Up"}
-              {!isSignup && <i className="fa fa-user-plus" aria-hidden="true"></i>}
+              {isSignup ? "Already have an account? Sign In" : "Need an account? Sign Up"}
             </button>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

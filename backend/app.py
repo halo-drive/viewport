@@ -294,9 +294,6 @@ def api_status():
 # ------------------------
 
 
-# --- Remove Development Server Execution ---
-# if __name__ == '__main__':
-#    # DO NOT use app.run() in production! Use Gunicorn via systemd.
-#    # app.run(host='0.0.0.0', port=443, debug=True) # <-- COMMENTED OUT / DELETED
-#    pass # Keep the block empty or remove it entirely
-# -----------------------------------------
+# for dev
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=443, debug=True) 

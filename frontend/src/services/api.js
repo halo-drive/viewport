@@ -1,4 +1,7 @@
+//for prod
 const API_BASE_URL = '';
+//for dev
+//const API_BASE_URL = 'http://localhost:443';
 
 // Generic API request handler
 async function apiRequest(url, method = 'GET', data = null) {
