@@ -9,6 +9,8 @@ from flask import (
 )
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
+from electric_api import electric_api_bp
+from electric import electric_bp
 
 # --- Project Imports ---
 from config import Config
@@ -82,6 +84,8 @@ app.register_blueprint(diesel_api_bp)
 app.register_blueprint(hydrogen_api_bp)
 app.register_blueprint(weather_test_bp)
 app.register_blueprint(auth_api_bp) # Contains /api/auth routes
+app.register_blueprint(electric_api_bp)  # Register electric API routes
+app.register_blueprint(electric_bp)      # Register electric UI routes
 # ---------------------------
 
 # --- Error Handlers ---
@@ -295,5 +299,5 @@ def api_status():
 
 
 # for dev
-# if __name__ == '__main__':
-#     app.run(host='0.0.0.0', port=443, debug=True) 
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=443, debug=True) 

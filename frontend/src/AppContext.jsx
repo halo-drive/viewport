@@ -25,6 +25,7 @@ export const AppProvider = ({ children }) => {
     
     // Clear session storage
     sessionStorage.removeItem('currentFuelType');
+    sessionStorage.removeItem('stationNames');
   };
 
   return (

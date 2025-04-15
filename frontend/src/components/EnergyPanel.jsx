@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AppContext } from '../AppContext';
 import dieselPump from '../assets/diesel-pump.png';
 import hydrogenPump from '../assets/hydrogen-pump.png';
+import chargingStationIcon from '../assets/charging-station.png'; // You'll need to add this image asset
 import green from '../assets/green.png';
 import red from '../assets/red.png';
 
@@ -40,6 +41,7 @@ export default function EnergyPanel() {
       // Default station names if none found
       const dieselStationName = stationNames.length > 0 ? stationNames[0] : 'Central Depot Station';
       const hydrogenStationName = stationNames.length > 0 ? stationNames[0] : 'Hydrogen Hub Station';
+      const electricStationName = stationNames.length > 0 ? stationNames[0] : 'EV Charging Hub';
       
       // No data exists yet - generate new random data
       // Random diesel level (100-1500 L)
@@ -48,6 +50,9 @@ export default function EnergyPanel() {
       // Random hydrogen level (10-80 kg)
       const randomHydrogen = Math.floor(Math.random() * (80 - 10 + 1)) + 10;
       
+      // Random electric battery charge (10-95%)
+      const randomBatteryCharge = Math.floor(Math.random() * (95 - 10 + 1)) + 10;
+      
       // Random available filling points (2-6)
       const availablePoints = Math.floor(Math.random() * (6 - 2 + 1)) + 2;
       
@@ -55,6 +60,11 @@ export default function EnergyPanel() {
       const compressionOptions = [14, 40, 80];
       const randomCompression = compressionOptions[Math.floor(Math.random() * compressionOptions.length)];
       const randomCapacity = Math.floor(Math.random() * (1000 - 500 + 1)) + 500;
+      
+      // Random electric charging station data
+      const chargingPowerOptions = [150, 250, 350, 500];
+      const randomChargingPower = chargingPowerOptions[Math.floor(Math.random() * chargingPowerOptions.length)];
+      const randomAvailableChargers = Math.floor(Math.random() * (8 - 1 + 1)) + 1;
       
       // Random time for scheduled start
       const hours = Math.floor(Math.random() * 24);
@@ -70,6 +80,7 @@ export default function EnergyPanel() {
       const newEnergyData = {
         dieselLevel: randomDiesel,
         hydrogenLevel: randomHydrogen,
+        batteryCharge: randomBatteryCharge,
         dieselStation: {
           name: dieselStationName,
           availablePoints: availablePoints,
@@ -81,6 +92,13 @@ export default function EnergyPanel() {
           capacity: randomCapacity,
           scheduledStart: scheduledStart,
           estimatedFinish: estimatedFinish
+        },
+        electricStation: {
+          name: electricStationName,
+          chargingPower: randomChargingPower,
+          availableChargers: randomAvailableChargers,
+          totalChargers: 8,
+          estimatedTime: `${Math.floor(Math.random() * (180 - 60 + 1)) + 60} mins`
         }
       };
       
@@ -125,7 +143,7 @@ export default function EnergyPanel() {
             </div>
             <div className="fuel-value">{energyData.dieselLevel} Litres</div>
           </div>
-        ) : (
+        ) : journeyFuelType === 'Hydrogen' ? (
           <div className="fuel-display">
             <div className="fuel-icon-container">
               <img src={hydrogenPump} alt="Hydrogen" className="fuel-icon" />
@@ -140,6 +158,22 @@ export default function EnergyPanel() {
               ></div>
             </div>
             <div className="fuel-value">{energyData.hydrogenLevel} Kg</div>
+          </div>
+        ) : (
+          <div className="fuel-display">
+            <div className="fuel-icon-container">
+              <img src={chargingStationIcon} alt="Battery" className="fuel-icon" />
+            </div>
+            <div className="fuel-bar-container">
+              <div 
+                className="fuel-bar-fill" 
+                style={{ 
+                  width: `${energyData.batteryCharge}%`,
+                  backgroundColor: getFuelBarColor(energyData.batteryCharge, 100)
+                }}
+              ></div>
+            </div>
+            <div className="fuel-value">{energyData.batteryCharge}% Charged</div>
           </div>
         )}
       </div>
@@ -178,7 +212,7 @@ export default function EnergyPanel() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : journeyFuelType === 'Hydrogen' ? (
           <div className="station-display">
             <h4 className="station-name">{energyData.hydrogenStation.name}</h4>
             <div className="hydrogen-station-details">
@@ -197,6 +231,42 @@ export default function EnergyPanel() {
               <div className="detail-item">
                 <span className="detail-label">Estimated Finish:</span>
                 <span className="detail-value">{energyData.hydrogenStation.estimatedFinish}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="station-display">
+            <h4 className="station-name">{energyData.electricStation.name}</h4>
+            <div className="electric-station-details">
+              <div className="detail-item">
+                <span className="detail-label">Charging Power:</span>
+                <span className="detail-value">{energyData.electricStation.chargingPower} kW</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Available Chargers:</span>
+                <span className="detail-value">{energyData.electricStation.availableChargers} / {energyData.electricStation.totalChargers}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Est. Charging Time:</span>
+                <span className="detail-value">{energyData.electricStation.estimatedTime}</span>
+              </div>
+              <div className="charging-status">
+                <div className="charging-points-row">
+                  {[...Array(energyData.electricStation.totalChargers)].map((_, index) => (
+                    <span 
+                      key={index}
+                      className={`charging-point ${index < energyData.electricStation.availableChargers ? 'available' : 'occupied'}`}
+                      style={{
+                        display: 'inline-block',
+                        width: '15px',
+                        height: '15px',
+                        borderRadius: '50%',
+                        margin: '0 5px',
+                        backgroundColor: index < energyData.electricStation.availableChargers ? '#2ecc71' : '#e74c3c'
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

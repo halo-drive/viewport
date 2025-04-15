@@ -5,6 +5,7 @@ import 'leaflet-routing-machine';
 import markerImg from "../assets/marker.png";
 import dieselPumpImg from "../assets/diesel-pump.png";
 import hydrogenPumpImg from "../assets/hydrogen-pump.png";
+import chargingStationImg from "../assets/charging-station.png"; // Add this image asset
 import { AppContext } from '../AppContext';
 
 // Import the station location finder
@@ -35,7 +36,8 @@ const RouteDisplay = ({ origin, destination }) => {
     setIsLoading,
     routeData,
     journeyProcessed,
-    stationDataList
+    stationDataList,
+    setStationDataList
   } = useContext(AppContext);
 
   // Get the current fuel type from sessionStorage
@@ -87,6 +89,9 @@ const RouteDisplay = ({ origin, destination }) => {
     if (routeData && routeData.stations && routeData.stations.length > 0) {
       console.log("Found stations in route data:", routeData.stations);
       
+      // Clear existing station data when route data changes
+      setStationDataList([]);
+      
       // Get location names for stations
       getStationLocationNames(routeData.stations)
         .then(locationsWithNames => {
@@ -96,7 +101,7 @@ const RouteDisplay = ({ origin, destination }) => {
           console.error("Error getting station location names:", error);
         });
     }
-  }, [routeData]);
+  }, [routeData, setStationDataList]);
 
   useEffect(() => {
     // Clean up previous route elements
@@ -121,12 +126,32 @@ const RouteDisplay = ({ origin, destination }) => {
     });
 
     // Create custom icon for fuel stations based on fuel type
-    const fuelStationIcon = L.icon({
-      iconUrl: fuelType === 'Hydrogen' ? hydrogenPumpImg : dieselPumpImg,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -32]
-    });
+    const getFuelStationIcon = () => {
+      if (fuelType === 'Electric') {
+        return L.icon({
+          iconUrl: chargingStationImg,
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        });
+      } else if (fuelType === 'Hydrogen') {
+        return L.icon({
+          iconUrl: hydrogenPumpImg,
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        });
+      } else {
+        return L.icon({
+          iconUrl: dieselPumpImg,
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        });
+      }
+    };
+
+    const fuelStationIcon = getFuelStationIcon();
 
     // Create new markers and route line
     if (routeData && routeData.coordinates && routeData.coordinates.length > 0) {
@@ -172,7 +197,9 @@ const RouteDisplay = ({ origin, destination }) => {
                 setSelectedStationIndex(index);
               });
               
-              //marker.bindPopup(`${fuelType} ${station.stationName}`);
+              const stationTypeLabel = fuelType === 'Electric' ? 'Charging' : fuelType;
+              marker.bindPopup(`${stationTypeLabel} ${station.stationName}`);
+              
               addLayerToMap(marker);
             });
           })
@@ -187,7 +214,9 @@ const RouteDisplay = ({ origin, destination }) => {
                 setSelectedStationIndex(index);
               });
               
-              //marker.bindPopup(`${fuelType} Station ${index + 1}`);
+              const stationTypeLabel = fuelType === 'Electric' ? 'Charging' : fuelType;
+              marker.bindPopup(`${stationTypeLabel} Station ${index + 1}`);
+              
               addLayerToMap(marker);
             });
           });

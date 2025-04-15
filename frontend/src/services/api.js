@@ -1,7 +1,7 @@
 //for prod
-const API_BASE_URL = '';
+//const API_BASE_URL = '';
 //for dev
-//const API_BASE_URL = 'http://localhost:443';
+const API_BASE_URL = 'http://localhost:443';
 
 // Generic API request handler
 async function apiRequest(url, method = 'GET', data = null) {
@@ -60,6 +60,7 @@ export const api = {
   // Route calculation
   calculateDieselRoute: (formData) => apiRequest('/api/diesel/route', 'POST', formData),
   calculateHydrogenRoute: (formData) => apiRequest('/api/hydrogen/route', 'POST', formData),
+  calculateElectricRoute: (formData) => apiRequest('/api/electric/route', 'POST', formData),
 
   getAllUsers: () => apiRequest('/api/admin/get-all-users'),
   deleteUser: (formData) => apiRequest('/api/admin/delete-user', 'POST', formData)

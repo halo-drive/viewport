@@ -13,8 +13,9 @@ export default function StartForm() {
     setIsLoading,
     setRouteData,
     setAnalyticsData,
-    setEnergyData, // Added this to reset energy data
-    resetJourneyData // Use the new reset function
+    setEnergyData,
+    setStationDataList,  // Important: add this to the destructured context 
+    resetJourneyData 
   } = useContext(AppContext);
 
   const { logout } = useContext(AuthContext);
@@ -94,8 +95,10 @@ export default function StartForm() {
     // Reset vehicle model to appropriate default based on fuel type
     if (fuelType === 'Diesel') {
       updatedFormData.vehicleModel = 'VOLVO FH 520';
-    } else {
+    } else if (fuelType === 'Hydrogen') {
       updatedFormData.vehicleModel = 'HVS HGV';
+    } else if (fuelType === 'Electric') {
+      updatedFormData.vehicleModel = 'Volvo FE Electric';
     }
     
     setFormData(updatedFormData);
@@ -138,6 +141,9 @@ export default function StartForm() {
     e.preventDefault();
     setError('');
     
+    // Important: Clear previous station data when submitting a new journey
+    setStationDataList([]);
+    
     // Reset energy data for new journey
     setEnergyData(null);
     
@@ -170,16 +176,21 @@ export default function StartForm() {
       apiFormData.append('journeyDate', formData.journeyDate);
       
       // Add fuel type specific fields
-      if (formData.fuelType === 'Hydrogen') {
+      if (formData.fuelType === 'Hydrogen' || formData.fuelType === 'Electric') {
         apiFormData.append('fuelAtOrigin', formData.fuelAtOrigin);
         apiFormData.append('fuelStation1', formData.fuelStation1);
         apiFormData.append('fuelStation2', formData.fuelStation2);
       }
       
       // Call the appropriate API based on fuel type
-      const result = await (formData.fuelType === 'Diesel' 
-        ? api.calculateDieselRoute(apiFormData)
-        : api.calculateHydrogenRoute(apiFormData));
+      let result;
+      if (formData.fuelType === 'Diesel') {
+        result = await api.calculateDieselRoute(apiFormData);
+      } else if (formData.fuelType === 'Hydrogen') {
+        result = await api.calculateHydrogenRoute(apiFormData);
+      } else if (formData.fuelType === 'Electric') {
+        result = await api.calculateElectricRoute(apiFormData);
+      }
       
       if (result.success) {
         // Store route and analytics data
@@ -230,6 +241,13 @@ export default function StartForm() {
           >
             Hydrogen
           </button>
+          <button 
+            type="button"
+            className={`fuel-btn ${formData.fuelType === 'Electric' ? 'active' : ''}`}
+            onClick={() => handleFuelTypeChange('Electric')}
+          >
+            Electric
+          </button>
         </div>
       </div>
 
@@ -260,11 +278,24 @@ export default function StartForm() {
               <option value="DAF XG 530">DAF XG 530</option>
               <option value="SCANIA R 450">SCANIA R 450</option>
             </>
-          ) : (
+          ) : formData.fuelType === 'Hydrogen' ? (
             <>
               <option value="HVS HGV">HVS HGV</option>
               <option value="HVS MCV">HVS MCV</option>
               <option value="Hymax Series">Hymax Series</option>
+            </>
+          ) : (
+            <>
+              <option value="Volvo FE Electric">Volvo FE Electric</option>
+              <option value="DAF CF Electric">DAF CF Electric</option>
+              <option value="Mercedes eActros">Mercedes eActros</option>
+              <option value="MAN eTGM">MAN eTGM</option>
+              <option value="Renault E-Tech D">Renault E-Tech D</option>
+              <option value="Scania BEV">Scania BEV</option>
+              <option value="Volvo FL Electric">Volvo FL Electric</option>
+              <option value="FUSO eCanter">FUSO eCanter</option>
+              <option value="Freightliner eCascadia">Freightliner eCascadia</option>
+              <option value="BYD ETM6">BYD ETM6</option>
             </>
           )}
         </select>
@@ -320,7 +351,7 @@ export default function StartForm() {
         />
       </div>
 
-      {formData.fuelType === 'Hydrogen' && (
+      {(formData.fuelType === 'Hydrogen' || formData.fuelType === 'Electric') && (
         <>
           <div className="form-group">
             <label htmlFor="fuelStation1">Fuel Range at Station 1:</label>

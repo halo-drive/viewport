@@ -64,6 +64,10 @@ hydrogen_data = {
 
 routemap_bp = Blueprint('routemap', __name__)
 
+@routemap_bp.route('/eroute')
+def eroute():
+    return render_template('eroute.html')
+
 @routemap_bp.route('/droute')
 def droute():
     return render_template('droute.html')

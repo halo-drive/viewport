@@ -4,6 +4,7 @@ import green from '../assets/green.png';
 import red from '../assets/red.png';
 import hydrogenPump from '../assets/hydrogen-pump.png';
 import dieselPump from '../assets/diesel-pump.png';
+import chargingStationIcon from '../assets/charging-station.png'; // You'll need to add this image asset
 import FuelGauge from './FuelGauge';
 import './StationCards.css';
 
@@ -64,10 +65,14 @@ const StationCards = ({ onClose }) => {
       // Random hydrogen level (10-80 kg)
       const randomHydrogen = Math.floor(Math.random() * (80 - 10 + 1)) + 10;
       
+      // Random battery charge level (10-95%)
+      const randomBatteryCharge = Math.floor(Math.random() * (95 - 10 + 1)) + 10;
+      
       // Create the energy data
       const newEnergyData = {
         dieselLevel: randomDiesel,
-        hydrogenLevel: randomHydrogen
+        hydrogenLevel: randomHydrogen,
+        batteryCharge: randomBatteryCharge
       };
       
       // Store in context for persistence
@@ -75,15 +80,14 @@ const StationCards = ({ onClose }) => {
     }
   }, [journeyProcessed, energyData, setEnergyData]);
   
-  // Generate station data when route data changes and no existing data
+  // Generate station data when route data changes
   useEffect(() => {
-    // Only generate new data if we don't already have data for the stations
-    // or if the route data has changed (new journey processed)
+    // Check if we have a new journey with stations
     if (
       journeyProcessed && 
       routeData && 
       routeData.stations && 
-      (stationDataList.length === 0 || stationDataList.length !== routeData.stations.length)
+      routeData.stations.length > 0
     ) {
       // Try to get station names from session storage
       let stationNames = [];
@@ -104,8 +108,7 @@ const StationCards = ({ onClose }) => {
         if (fuelType === 'Diesel') {
           // Random available filling points (2-6)
           const availablePoints = Math.floor(Math.random() * (6 - 2 + 1)) + 2;
-          // Random total fuel amount (1200-2950 L)
-          // Random total fuel amount (10000-24000 L) - Updated range
+          // Random total fuel amount (10000-24000 L)
           const totalFuel = Math.floor(Math.random() * (24000 - 10000 + 1)) + 10000;
           
           return {
@@ -114,7 +117,7 @@ const StationCards = ({ onClose }) => {
             totalPoints: 8,
             totalFuel: totalFuel
           };
-        } else {
+        } else if (fuelType === 'Hydrogen') {
           // Random hydrogen station data
           const compressionOptions = [14, 40, 80];
           const randomCompression = compressionOptions[Math.floor(Math.random() * compressionOptions.length)];
@@ -137,23 +140,37 @@ const StationCards = ({ onClose }) => {
             scheduledStart: scheduledStart,
             estimatedFinish: estimatedFinish
           };
+        } else {
+          // Electric charging station data
+          const chargingPowerOptions = [50, 100, 150, 350];
+          const randomChargingPower = chargingPowerOptions[Math.floor(Math.random() * chargingPowerOptions.length)];
+          
+          // Random available chargers (1-6 out of 8 total)
+          const availableChargers = Math.floor(Math.random() * (6 - 1 + 1)) + 1;
+          
+          // Random charging time
+          const estimatedChargingTime = `${Math.floor(Math.random() * (120 - 30 + 1)) + 30} mins`;
+          
+          // Random charging cost
+          const chargingCost = (Math.random() * (35 - 15) + 15).toFixed(2);
+          
+          return {
+            name: stationName,
+            chargingPower: randomChargingPower,
+            availableChargers: availableChargers,
+            totalChargers: 8,
+            estimatedChargingTime: estimatedChargingTime,
+            chargingCost: chargingCost
+          };
         }
       });
       
       // Save the generated data to context to persist it
       setStationDataList(newStationDataList);
     }
-  }, [routeData, journeyProcessed, fuelType, stationDataList.length, setStationDataList]);
+  }, [routeData, journeyProcessed, fuelType, setStationDataList]);
   
-  // Helper function to get color for fuel level bar
-  const getFuelBarColor = (level, max) => {
-    const percentage = level / max;
-    
-    if (percentage < 0.3) return '#e74c3c'; // Red for low
-    if (percentage < 0.6) return '#f39c12'; // Orange for medium
-    return '#2ecc71'; // Green for high
-  };
-  
+  // Return early if no data
   if (stationDataList.length === 0 || !energyData) {
     return null;
   }
@@ -165,7 +182,7 @@ const StationCards = ({ onClose }) => {
           <div key={index} className="station-card">
             <div className="station-card-header">
               <img 
-                src={fuelType === 'Hydrogen' ? hydrogenPump : dieselPump} 
+                src={fuelType === 'Hydrogen' ? hydrogenPump : fuelType === 'Electric' ? chargingStationIcon : dieselPump} 
                 alt={fuelType} 
                 className="station-card-icon" 
               />
@@ -205,7 +222,7 @@ const StationCards = ({ onClose }) => {
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : fuelType === 'Hydrogen' ? (
               <div className="station-display">
                 <div className="hydrogen-station-details">
                   <div className="detail-item">
@@ -226,36 +243,78 @@ const StationCards = ({ onClose }) => {
                   </div>
                 </div>
               </div>
+            ) : (
+              <div className="station-display">
+                <div className="electric-station-details">
+                  <div className="detail-item">
+                    <span className="detail-label">Charging Power:</span>
+                    <span className="detail-value">{stationData.chargingPower} kW</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Est. Charging Time:</span>
+                    <span className="detail-value">{stationData.estimatedChargingTime}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Est. Cost:</span>
+                    <span className="detail-value">£{stationData.chargingCost}</span>
+                  </div>
+                  <div className="charging-status">
+                    <div className="charging-points-visual" style={{ display: 'flex', justifyContent: 'center', margin: '10px 0' }}>
+                      {[...Array(stationData.totalChargers)].map((_, i) => (
+                        <span 
+                          key={i} 
+                          className={`charging-point ${i < stationData.availableChargers ? 'available' : 'occupied'}`}
+                          title={i < stationData.availableChargers ? 'Available' : 'Occupied'}
+                          style={{
+                            display: 'inline-block',
+                            width: '15px',
+                            height: '15px',
+                            borderRadius: '50%',
+                            margin: '0 5px',
+                            backgroundColor: i < stationData.availableChargers ? '#2ecc71' : '#e74c3c'
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="filling-status">
+                      <span className="available-count">{stationData.availableChargers} Free</span>
+                      <span className="occupied-count">{stationData.totalChargers - stationData.availableChargers} Used</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         ))}
       </div>
 
       {/* Fuel Card at the bottom of the screen */}
-<div className="fuel-card-container">
-  <div className="fuel-card">
-    {/* Fuel Gauge */}
-    <FuelGauge 
-      value={fuelType === 'Hydrogen' ? energyData.hydrogenLevel : energyData.dieselLevel}
-      maxValue={fuelType === 'Hydrogen' ? 80 : 1500}
-      type={fuelType}
-    />
-    
-    {/* Value display with icon to the left */}
-    <div className="fuel-value-container">
-      <img 
-        src={fuelType === 'Hydrogen' ? hydrogenPump : dieselPump} 
-        alt={fuelType} 
-        className="fuel-value-icon" 
-      />
-      <div className="fuel-value-text">
-        {fuelType === 'Hydrogen' 
-          ? `${energyData.hydrogenLevel} Kg` 
-          : `${energyData.dieselLevel} Litres`}
+      <div className="fuel-card-container">
+        <div className="fuel-card">
+          {/* Fuel Gauge */}
+          <FuelGauge 
+            value={fuelType === 'Electric' ? energyData.batteryCharge : fuelType === 'Hydrogen' ? energyData.hydrogenLevel : energyData.dieselLevel}
+            maxValue={fuelType === 'Electric' ? 100 : fuelType === 'Hydrogen' ? 80 : 1500}
+            type={fuelType}
+          />
+          
+          {/* Value display with icon to the left */}
+          <div className="fuel-value-container">
+            <img 
+              src={fuelType === 'Electric' ? chargingStationIcon : fuelType === 'Hydrogen' ? hydrogenPump : dieselPump} 
+              alt={fuelType} 
+              className="fuel-value-icon" 
+            />
+            <div className="fuel-value-text">
+              {fuelType === 'Electric' 
+                ? `${energyData.batteryCharge}% Charged` 
+                : fuelType === 'Hydrogen'
+                  ? `${energyData.hydrogenLevel} Kg`
+                  : `${energyData.dieselLevel} Litres`}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
     </>
   );
 };
