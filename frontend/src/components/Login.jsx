@@ -19,16 +19,33 @@ export default function Login() {
     const initMap = async () => {
       // Only import leaflet on client-side
       const L = await import('leaflet');
-      
+
       // Initialize map if it doesn't exist yet
       if (!mapRef.current) {
-        // London coordinates (starting point)
+        // Define coordinates
         const londonCoordinates = [51.461883, -0.087581];
-        
-        // Create map centered on London with a lower zoom to show more area
+        const glasgowCoordinates = [55.8642, -4.2518]; // Glasgow coordinates
+
+        // --- Calculate direction vector ---
+        const startLat = londonCoordinates[0];
+        const startLon = londonCoordinates[1];
+        const endLat = glasgowCoordinates[0];
+        const endLon = glasgowCoordinates[1];
+
+        const deltaLat = endLat - startLat; // Total change in latitude
+        const deltaLon = endLon - startLon; // Total change in longitude
+
+        // --- Define step size ---
+        // Keep vertical movement similar to before for consistent speed feel
+        const latStep = 0.02;
+        // Calculate proportional longitude step (avoid division by zero if deltaLat is 0)
+        const lonStep = (deltaLat !== 0) ? deltaLon * (latStep / deltaLat) : 0;
+        // -----------------------------
+
+        // Create map centered on London
         const map = L.map('map-background', {
           center: londonCoordinates,
-          zoom: 10,  // Lower zoom to show more of the UK
+          zoom: 10, // Lower zoom to show more of the UK
           zoomControl: false,
           attributionControl: false,
           dragging: false,
@@ -37,64 +54,72 @@ export default function Login() {
           keyboard: false,
           touchZoom: false
         });
-        
+
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap contributors'
         }).addTo(map);
-        
+
         // Store map reference
         mapRef.current = map;
-        
-        // Create a continuous panning effect that preloads tiles
-        // This uses Leaflet's own methods to ensure tiles are loaded properly
+
+        // Create a continuous panning effect towards Glasgow
         const panStep = () => {
           const currentCenter = map.getCenter();
-          // Move consistently northward (up the UK)
-          const newLat = currentCenter.lat + 0.02; // Small increment for smooth movement
-          
-          // Ensure we're still showing map tiles (stay within UK northern limits)
-          if (newLat < 58.5) { // Northern tip of Scotland is around 58.5 latitude
-            // Pan to new location
-            map.panTo([newLat, currentCenter.lng], {
+
+          // Calculate next position
+          const newLat = currentCenter.lat + latStep;
+          const newLon = currentCenter.lng + lonStep;
+
+          // Check if we've reached or passed Glasgow's latitude
+          // (Since we're moving north, we check if newLat is still less than endLat)
+          if (newLat < endLat) {
+            // Pan to new location along the angled line
+            map.panTo([newLat, newLon], {
               animate: true,
               duration: 2.0, // Smooth animation over 2 seconds
-              easeLinearity: 1 // Linear movement (no acceleration/deceleration)
+              easeLinearity: 1 // Linear movement
             });
-            
+
             // Schedule next pan after this one completes
             setTimeout(panStep, 2100); // Slightly longer than animation duration
           } else {
-            // We've reached northern Scotland, reset to London
+            // We've reached Glasgow (or slightly passed), reset to London
+            // Optional: Snap exactly to Glasgow first for a brief moment?
+            // map.panTo(glasgowCoordinates, { animate: false });
+
             // Use a quick fade out/in effect to hide the transition
             document.getElementById('map-background').style.opacity = 0;
-            
+
             setTimeout(() => {
-              map.panTo(londonCoordinates, { animate: false });
+              map.panTo(londonCoordinates, { animate: false }); // Reset to London
               document.getElementById('map-background').style.opacity = 1;
-              
+
               // Restart the movement
-              setTimeout(panStep, 500);
-            }, 1000);
+              setTimeout(panStep, 500); // Wait half a second before starting again
+            }, 1000); // Fade transition time
           }
         };
-        
+
         // Start the panning effect
         panStep();
       }
     };
-    
+
     initMap();
-    
+
     // Clean up on unmount
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
+      // Clear any pending timeouts if component unmounts mid-animation
+      // Note: This requires storing timeout IDs, adding complexity.
+      // For a purely decorative background, maybe not strictly necessary.
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -158,7 +183,7 @@ export default function Login() {
             <i className="fa fa-envelope input-icon"></i>
             <input 
               className="form-input" 
-              type="email" 
+               
               placeholder="Email Address" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}

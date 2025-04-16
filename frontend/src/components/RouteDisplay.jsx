@@ -85,23 +85,23 @@ const RouteDisplay = ({ origin, destination }) => {
   };
 
   // Effect to get station location names when route data changes
-  useEffect(() => {
-    if (routeData && routeData.stations && routeData.stations.length > 0) {
-      console.log("Found stations in route data:", routeData.stations);
+  // useEffect(() => {
+  //   if (routeData && routeData.stations && routeData.stations.length > 0) {
+  //     console.log("Found stations in route data:", routeData.stations);
       
-      // Clear existing station data when route data changes
-      setStationDataList([]);
+  //     // Clear existing station data when route data changes
+  //     setStationDataList([]);
       
-      // Get location names for stations
-      getStationLocationNames(routeData.stations)
-        .then(locationsWithNames => {
-          console.log("Stations with location names:", locationsWithNames);
-        })
-        .catch(error => {
-          console.error("Error getting station location names:", error);
-        });
-    }
-  }, [routeData, setStationDataList]);
+  //     // Get location names for stations
+  //     getStationLocationNames(routeData.stations)
+  //       .then(locationsWithNames => {
+  //         console.log("Stations with location names:", locationsWithNames);
+  //       })
+  //       .catch(error => {
+  //         console.error("Error getting station location names:", error);
+  //       });
+  //   }
+  // }, [routeData, setStationDataList]);
 
   useEffect(() => {
     // Clean up previous route elements
@@ -111,7 +111,7 @@ const RouteDisplay = ({ origin, destination }) => {
 
     // Get the fuel type
     const fuelType = getCurrentFuelType();
-    console.log("Current fuel type:", fuelType);
+    //console.log("Current fuel type:", fuelType);
 
     // Get coordinates for origin and destination
     const startPoint = depotCoordinates[origin] || [51.5074, -0.1278]; // Default to London
@@ -176,6 +176,7 @@ const RouteDisplay = ({ origin, destination }) => {
       // Add fuel station markers if present
       if (routeData.stations && routeData.stations.length > 0) {
         // First try to get location names (async)
+        //console.log("Original routeData.stations:", JSON.stringify(routeData.stations, null, 2));
         getStationLocationNames(routeData.stations)
           .then(stationsWithNames => {
             // Store station names in session storage for Energy tab

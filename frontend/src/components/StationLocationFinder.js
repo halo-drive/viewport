@@ -12,7 +12,7 @@ export const getStationLocationNames = async (stations) => {
       return [];
     }
     
-    console.log("Finding location names for stations:", stations);
+    //console.log("Finding location names for stations:", stations);
     
     try {
       const locationPromises = stations.map(async (station) => {
@@ -69,7 +69,7 @@ export const getStationLocationNames = async (stations) => {
         const firstPart = locationName.split(',')[0].trim();
         const stationName = `${firstPart} Station`;
         
-        console.log(`Station at [${lat}, ${lng}] -> "${locationName}" -> "${stationName}"`);
+        //console.log(`Station at [${lat}, ${lng}] -> "${locationName}" -> "${stationName}"`);
         
         return {
           coordinates: [lat, lng],
