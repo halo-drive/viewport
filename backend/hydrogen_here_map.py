@@ -1,20 +1,21 @@
-# %%
+# hydrogen_here_map.py - Modified to provide map data functions for hydrogen_api.py
+# OPTIMIZED VERSION: Geocodes each city only once in find_nearest_stations.
+
+# Keep necessary imports for the functions used by hydrogen_api.py
 from geopy.distance import geodesic
-import folium
 import requests
-import pandas as pd
-from geopy.geocoders import Nominatim
+from geopy.geocoders import Nominatim # Kept as it's used by the kept get_coordinates
 from collections import namedtuple
-from flask import Blueprint, render_template
+import time # Import time if needed for rate limiting Nominatim
+
+# Removed: folium, pandas, Blueprint, render_template (as they are unused)
+
 from config import Config
 
-
-
-
-# HERE Maps API key
+# Keep HERE API Key
 here_api_key = Config.HERE_API_KEY
 
-# Polyline decoding functions and constants
+# Keep Polyline decoding functions and constants (needed by get_here_directions)
 FORMAT_VERSION = 1
 DECODING_TABLE = [62, -1, -1, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1, -1,
                   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
@@ -24,33 +25,41 @@ DECODING_TABLE = [62, -1, -1, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1
 PolylineHeader = namedtuple('PolylineHeader', 'precision,third_dim,third_dim_precision')
 
 def decode_header(decoder):
-    version = next(decoder)
-    if version != FORMAT_VERSION:
-        raise ValueError('Invalid format version')
-    value = next(decoder)
-    precision = value & 15
-    value >>= 4
-    third_dim = value & 7
-    third_dim_precision = (value >> 3) & 15
-    return PolylineHeader(precision, third_dim, third_dim_precision)
+    """Decodes the polyline header."""
+    try:
+        version = next(decoder)
+        if version != FORMAT_VERSION:
+            raise ValueError('Invalid format version')
+        value = next(decoder)
+        precision = value & 15
+        value >>= 4
+        third_dim = value & 7
+        third_dim_precision = (value >> 3) & 15
+        return PolylineHeader(precision, third_dim, third_dim_precision)
+    except StopIteration:
+        raise ValueError("Invalid encoding. Empty string or missing header.")
+
 
 def decode_char(char):
+    """Decodes a single character."""
     char_value = ord(char)
     try:
         value = DECODING_TABLE[char_value - 45]
     except IndexError:
-        raise ValueError('Invalid encoding')
+        raise ValueError('Invalid encoding character')
     if value < 0:
-        raise ValueError('Invalid encoding')
+        raise ValueError('Invalid encoding character')
     return value
 
 def to_signed(value):
+    """Converts zigzag-encoded value to signed integer."""
     if value & 1:
         value = ~value
     value >>= 1
     return value
 
 def decode_unsigned_values(encoded):
+    """Decodes the polyline string into unsigned integer values."""
     result = shift = 0
     for char in encoded:
         value = decode_char(char)
@@ -60,13 +69,29 @@ def decode_unsigned_values(encoded):
             result = shift = 0
         else:
             shift += 5
+            # Add check for excessively long shifts, indicating potential corruption
+            if shift > 30: # 6 * 5 = 30 bits, covers 32-bit integers
+                 raise ValueError("Invalid encoding. Possible corruption detected.")
+    # Check if the last character indicated continuation
     if shift > 0:
-        raise ValueError('Invalid encoding')
+        raise ValueError('Invalid encoding. Unfinished sequence.')
 
 def iter_decode(encoded):
+    """Decodes a polyline string into an iterator of coordinate tuples."""
+    if not encoded: # Handle empty string input
+         return iter([]) # Return an empty iterator
+
     last_lat = last_lng = last_z = 0
     decoder = decode_unsigned_values(encoded)
-    header = decode_header(decoder)
+    try:
+        header = decode_header(decoder)
+    except ValueError as e: # Catch header decoding errors
+         print(f"Error decoding polyline header: {e}")
+         return iter([])
+    except StopIteration: # Catch empty decoder after header attempt
+         print("Error decoding polyline: No data after header.")
+         return iter([])
+
     factor_degree = 10.0 ** header.precision
     factor_z = 10.0 ** header.third_dim_precision
     third_dim = header.third_dim
@@ -74,261 +99,172 @@ def iter_decode(encoded):
         try:
             last_lat += to_signed(next(decoder))
         except StopIteration:
-            return
+            return # Normal end of iteration
+        except ValueError as e: # Catch errors decoding latitude delta
+             print(f"Error decoding latitude delta: {e}")
+             return iter([])
+
         try:
             last_lng += to_signed(next(decoder))
             if third_dim:
-                last_z += to_signed(next(decoder))
-                yield (last_lat / factor_degree, last_lng / factor_degree, last_z / factor_z)
+                # Need to handle StopIteration here too for the z value
+                try:
+                    last_z += to_signed(next(decoder))
+                    yield (last_lat / factor_degree, last_lng / factor_degree, last_z / factor_z)
+                except StopIteration:
+                     print("Error decoding polyline: Premature ending before Z delta.")
+                     raise ValueError("Invalid encoding. Premature ending before Z delta.")
             else:
                 yield (last_lat / factor_degree, last_lng / factor_degree)
         except StopIteration:
-            raise ValueError("Invalid encoding. Premature ending reached")
+             # This indicates incomplete pairs in the encoded string
+             print("Error decoding polyline: Premature ending after latitude delta.")
+             raise ValueError("Invalid encoding. Premature ending reached after latitude delta.")
+        except ValueError as e: # Catch errors decoding longitude/z delta
+             print(f"Error decoding longitude/z delta: {e}")
+             return iter([])
+
+
+# --- Keep Functions Used by hydrogen_api.py ---
 
 def get_here_directions(origin, destination, api_key):
+    """Gets route polyline coordinates using HERE Routing API."""
+    # Validate inputs
+    if not all([origin, destination, api_key]):
+        print("Warning: Missing input for get_here_directions")
+        return None
+    # Check if coordinates themselves are valid (not None)
+    if origin is None or destination is None or origin[0] is None or origin[1] is None or destination[0] is None or destination[1] is None:
+        print("Warning: None coordinate found in get_here_directions input")
+        return None
+
+    # Assumes origin and destination are (lat, lon) tuples
     url = f"https://router.hereapi.com/v8/routes?transportMode=car&origin={origin[0]},{origin[1]}&destination={destination[0]},{destination[1]}&return=polyline&apikey={api_key}"
-    response = requests.get(url)
-    if response.status_code == 200:
+    try:
+        # Consider adding a timeout
+        response = requests.get(url, timeout=20) # Increased timeout slightly for routing
+        response.raise_for_status()
         data = response.json()
-        if 'routes' in data and len(data['routes']) > 0:
-            route = data['routes'][0]
-            if 'sections' in route and len(route['sections']) > 0:
-                section = route['sections'][0]
-                if 'polyline' in section:
-                    polyline_str = section['polyline']
-                    decoded_geometry = list(iter_decode(polyline_str))
-                    return decoded_geometry
-    return None
+
+        # Safe access to nested data
+        routes = data.get('routes', [])
+        if routes:
+            sections = routes[0].get('sections', [])
+            if sections:
+                polyline_str = sections[0].get('polyline')
+                if polyline_str:
+                    # Decode and return list of (lat, lon) tuples
+                    decoded_route = list(iter_decode(polyline_str))
+                    if not decoded_route: # Check if decoding yielded anything
+                         print("Warning: Polyline decoding resulted in empty list.")
+                         return None
+                    return decoded_route
+        # Return None if expected data is missing
+        print("Warning: Polyline not found in HERE directions response.")
+        return None
+    except requests.exceptions.Timeout:
+         print(f"Error fetching HERE directions: Request timed out")
+         return None
+    except requests.exceptions.RequestException as e:
+         print(f"Error fetching HERE directions: {e}")
+         return None
+    except (ValueError, KeyError, IndexError, TypeError) as e:
+         # Catch potential errors during decoding or data access
+         print(f"Error processing HERE directions data: {e}")
+         return None
+
 
 def get_coordinates(city):
-    geolocator = Nominatim(user_agent="my_app", timeout=10)
-    location = geolocator.geocode(f"{city}, UK", exactly_one=True)
-    if location:
-        return location.latitude, location.longitude
-    else:
-        return None, None
+    """Gets coordinates for a city using Nominatim (OSM)."""
+    # Keep this specific implementation as requested, despite inconsistency
+    if not city: return None, None
+    try:
+        # Using a generic user agent - consider defining a specific one in Config
+        # Ensure Config object is accessible or pass user agent string directly
+        user_agent = getattr(Config, 'NOMINATIM_USER_AGENT', 'h2_route_app_v1')
+        geolocator = Nominatim(user_agent=user_agent, timeout=10)
+        # Add ", UK" for better specificity if needed, but check if city names already include it
+        query = city if "uk" in city.lower() else f"{city}, UK"
+        location = geolocator.geocode(query, exactly_one=True)
+        if location:
+            return location.latitude, location.longitude
+        else:
+            print(f"Warning: Nominatim could not geocode city: {city}")
+            return None, None
+    except Exception as e: # Catch potential geopy errors like RateLimiter, etc.
+         print(f"Error during Nominatim geocoding for {city}: {e}")
+         return None, None
 
+
+# --- REFACTORED FUNCTION (Optimized: Geocode Once) ---
 def find_nearest_stations(origin_city, station_cities, destination_city):
+    """
+    Finds nearest stations from a list based on custom distance/direction logic,
+    optimizing by geocoding each city only once.
+    """
+    print(f"Finding nearest stations: Origin={origin_city}, Dest={destination_city}") # Add logging
+    if not all([origin_city, station_cities, destination_city]):
+         print("Warning: Missing input for find_nearest_stations")
+         return []
+
+    # --- Step 1: Geocode Origin and Destination ---
     origin_coords = get_coordinates(origin_city)
     dest_coords = get_coordinates(destination_city)
-    valid_stations = {}
 
-    # Add stations within 40 miles to the valid_stations list
-    for station_city in station_cities:
-        station_coords = get_coordinates(station_city)
-        if station_coords[0] is not None and station_coords[1] is not None:
-            distance = geodesic(origin_coords, station_coords).miles
-            if distance <= 40:
-                valid_stations[station_city] = distance
+    if origin_coords is None or dest_coords is None or origin_coords[0] is None or dest_coords[0] is None:
+        print("Error: Could not geocode origin or destination city.")
+        return []
+    print(f"  Origin Coords: {origin_coords}")
+    print(f"  Dest Coords: {dest_coords}")
 
-    # Calculate direction
-    if dest_coords[0] > origin_coords[0]:
-        direction = "northbound"
-    else:
-        direction = "southbound"
+    # --- Step 2: Geocode all potential Station Cities ONCE ---
+    station_coords_cache = {}
+    print(f"  Geocoding {len(station_cities)} potential station cities...")
+    for city in station_cities:
+        coords = get_coordinates(city)
+        if coords and coords[0] is not None:
+            station_coords_cache[city] = coords
+        # Optional: Add short sleep if hitting Nominatim rate limits frequently
+        # time.sleep(0.5) # e.g., sleep half a second between calls
+    print(f"  Geocoded {len(station_coords_cache)} cities successfully.")
 
-    for station_city in station_cities:
-        station_coords = get_coordinates(station_city)
-        if station_coords[0] is not None and station_coords[1] is not None:
-            # Check if the station is in the correct direction
-            if direction == "northbound" and station_coords[0] > origin_coords[0]:
-                distance = geodesic(origin_coords, station_coords).miles
-                if distance <= 150:
-                    valid_stations[station_city] = distance
-            elif direction == "southbound" and station_coords[0] < origin_coords[0]:
-                distance = geodesic(origin_coords, station_coords).miles
-                if distance <= 150:
-                    valid_stations[station_city] = distance
+    # --- Step 3: Filter stations based on distance/direction using cached coords ---
+    valid_stations = {} # Store valid stations: {city_name: distance_from_origin}
+
+    # Determine general direction
+    direction = "northbound" if dest_coords[0] > origin_coords[0] else "southbound"
+    print(f"  Direction: {direction}")
+
+    for city, coords in station_coords_cache.items():
+        try:
+            distance = geodesic(origin_coords, coords).miles
+
+            # Check distance criteria (within 40 OR within 150 and correct direction)
+            is_close_enough = (distance <= 40)
+            is_directional = False
+            # Check direction relative to origin latitude
+            if distance <= 150:
+                 # Allow for slight variations or being exactly on the same latitude
+                 if direction == "northbound" and coords[0] >= origin_coords[0] - 0.01: # Small tolerance
+                     is_directional = True
+                 elif direction == "southbound" and coords[0] <= origin_coords[0] + 0.01: # Small tolerance
+                     is_directional = True
+
+            if is_close_enough or is_directional:
+                 valid_stations[city] = distance
+                 # print(f"  Keeping '{city}': Dist={distance:.1f} mi, Close={is_close_enough}, Directional={is_directional}") # Debug logging
+
+        except ValueError as e: # Catch potential errors from geodesic if coords are bad
+             print(f"Warning: Could not calculate distance for {city}: {e}")
 
     if not valid_stations:
+        print("  No valid stations found meeting criteria.")
         return []
 
-    nearest_stations = sorted(valid_stations.items(), key=lambda x: x[1])
+    # Sort the final list of valid stations by distance
+    nearest_stations = sorted(valid_stations.items(), key=lambda item: item[1])
+    print(f"  Found {len(nearest_stations)} nearest stations meeting criteria.")
     return nearest_stations
+# --- END REFACTORED FUNCTION ---
 
-def launch_all(origin_city, Fuel_range_at_origin, destination_city, fuel_consumption, Fuel_range_at_nearest_stations1, Fuel_range_at_nearest_stations2):
-    station_cities = ['Aberdeen', 'Birmingham', 'Cardiff', 'Glasgow', 'Leeds', 'Manchester', 'Liverpool', 'London']
-    nearest_stations = find_nearest_stations(origin_city, station_cities, destination_city)
 
-    if len(nearest_stations) != 0:
-        origin_coords = get_coordinates(origin_city)
-        dest_coords = get_coordinates(destination_city)
-        origin_dest_distance = geodesic(origin_coords, dest_coords).miles
-
-        if Fuel_range_at_origin > fuel_consumption:
-            origin_to_dest = get_here_directions(origin_coords, dest_coords, here_api_key)
-
-            if origin_to_dest:
-                map_osm = folium.Map(location=origin_coords, zoom_start=6)
-                folium.Marker(location=origin_coords, icon=folium.Icon(color='blue'), popup=f"Origin: {origin_city}").add_to(map_osm)
-                folium.Marker(location=dest_coords, icon=folium.Icon(color='blue'), popup=f"Destination: {destination_city}").add_to(map_osm)
-                folium.PolyLine(locations=origin_to_dest, color='cornflowerblue', weight=8).add_to(map_osm)
-
-                df_locations = pd.DataFrame(origin_to_dest, columns=['Latitude', 'Longitude'])
-                df0 = df_locations.to_json(orient='records')
-                map_osm.save("templates/hroute.html")
-                return map_osm
-
-        if len(nearest_stations) == 1:
-            a = nearest_stations[0]
-            a1 = a[0]
-            origin_coords = get_coordinates(origin_city)
-            near_station1_coords = get_coordinates(a1)
-            dest_coords = get_coordinates(destination_city)
-
-            origin_dest_distance = geodesic(origin_coords, dest_coords).miles
-
-            distance3 = geodesic(origin_coords, near_station1_coords).miles
-            distance4 = geodesic(near_station1_coords, dest_coords).miles
-            distance6 = geodesic(origin_coords, near_station1_coords).miles
-
-            Fuel_range_at_nearest_stations_1m = (Fuel_range_at_nearest_stations1*8 + Fuel_range_at_origin*8) - distance6
-            Fuel_range_req_from_nearest_stations1 = distance4
-            Fuel_req_from_nearest_stations1 = Fuel_range_req_from_nearest_stations1*0.33
-            Fuel_at_nearest_stations_1m = Fuel_range_at_nearest_stations_1m*0.33
-
-            if Fuel_at_nearest_stations_1m > Fuel_req_from_nearest_stations1:
-                print("The Fuel_range_at_nearest_stations1 ", Fuel_range_at_nearest_stations1)
-                print("The Fuel_req_from_nearest_stations1 ", Fuel_req_from_nearest_stations1)
-
-                origin_to_station1 = get_here_directions(origin_coords, near_station1_coords, here_api_key)
-                station1_to_dest = get_here_directions(near_station1_coords, dest_coords, here_api_key)
-
-                if origin_to_station1 and station1_to_dest:
-                    map_osm = folium.Map(location=origin_coords, zoom_start=6)
-                    folium.Marker(location=origin_coords, icon=folium.Icon(color='cornflowerblue'), popup=f"Origin: {origin_city}").add_to(map_osm)
-                    folium.Marker(location=near_station1_coords, icon=folium.Icon(color='blue'), popup=f"Station 1: {a1}").add_to(map_osm)
-                    folium.Marker(location=dest_coords, icon=folium.Icon(color='blue'), popup=f"Destination: {destination_city}").add_to(map_osm)
-                    folium.Marker(location=near_station1_coords, icon=folium.Icon(color='pink'), popup="1").add_to(map_osm)
-
-                    folium.PolyLine(locations=origin_to_station1, color='cornflowerblue', weight=8).add_to(map_osm)
-                    folium.PolyLine(locations=station1_to_dest, color='cornflowerblue', weight=8).add_to(map_osm)
-
-                    df_locations = pd.DataFrame(origin_to_station1 + station1_to_dest, columns=['Latitude', 'Longitude'])
-                    df0 = df_locations.to_json(orient='records')
-                    station_coords = [near_station1_coords[0], near_station1_coords[1]]
-                    df_coords = pd.DataFrame([station_coords], columns=['Latitude', 'Longitude'])
-
-                    map_osm.save("templates/hroute.html")
-                    return map_osm
-
-        elif len(nearest_stations) > 1:
-            a = nearest_stations[0]
-            a1 = a[0]
-            b = nearest_stations[1]
-            b1 = b[0]
-            origin_coords = get_coordinates(origin_city)
-            near_station1_coords = get_coordinates(a1)
-            near_station2_coords = get_coordinates(b1)
-            dest_coords = get_coordinates(destination_city)
-            origin_dest_distance = fuel_consumption*7
-            distance3 = geodesic(origin_coords, near_station1_coords).miles
-            distance4 = geodesic(near_station1_coords, dest_coords).miles
-            distance6 = geodesic(origin_coords, near_station1_coords).miles
-            distance7 = geodesic(near_station1_coords, near_station2_coords).miles
-            distance8 = geodesic(near_station2_coords, dest_coords).miles
-            distance9 = geodesic(near_station2_coords, dest_coords).miles
-            distance10 = geodesic(origin_coords, near_station2_coords).miles
-
-            Fuel_range_at_nearest_stations_1m = (Fuel_range_at_nearest_stations1 + Fuel_range_at_origin*8) - distance6
-            Fuel_range_req_from_nearest_stations1 = distance4
-            Fuel_range_req_from_nearest_stations2 = distance8
-            Fuel_range_at_nearest_stations_2m = (Fuel_range_at_nearest_stations1 + Fuel_range_at_nearest_stations2) - (distance6 + distance7)
-            Fuel_range_at_nearest_stations_2m1 = Fuel_range_at_nearest_stations2 - distance10
-            Fuel_at_nearest_stations_1m = Fuel_range_at_nearest_stations_1m*0.33
-            Fuel_req_from_nearest_stations1 = Fuel_range_req_from_nearest_stations1*0.33
-            Fuel_at_nearest_stations_2m1 = Fuel_range_at_nearest_stations_2m1*0.33
-            Fuel_req_from_nearest_stations2 = Fuel_range_req_from_nearest_stations2*0.33
-            Fuel_at_nearest_stations_2m = Fuel_range_at_nearest_stations_2m
-            
-            if Fuel_range_at_nearest_stations1 > Fuel_req_from_nearest_stations1:
-                print("The Fuel_range_at_nearest_stations1 ", Fuel_range_at_nearest_stations1)
-                print("The Fuel_req_from_nearest_stations1 ", Fuel_req_from_nearest_stations1)
-
-                origin_to_station1 = get_here_directions(origin_coords, near_station1_coords, here_api_key)
-                station1_to_dest = get_here_directions(near_station1_coords, dest_coords, here_api_key)
-
-                if origin_to_station1 and station1_to_dest:
-                    map_osm = folium.Map(location=origin_coords, zoom_start=6)
-                    folium.Marker(location=origin_coords, icon=folium.Icon(color='cornflowerblue'), popup=f"Origin: {origin_city}").add_to(map_osm)
-                    folium.Marker(location=near_station1_coords, icon=folium.Icon(color='blue'), popup=f"Station 1: {a1}").add_to(map_osm)
-                    folium.Marker(location=dest_coords, icon=folium.Icon(color='blue'), popup=f"Destination: {destination_city}").add_to(map_osm)
-                    folium.Marker(location=near_station1_coords, icon=folium.Icon(color='pink'), popup="1").add_to(map_osm)
-
-                    folium.PolyLine(locations=origin_to_station1, color='cornflowerblue', weight=8).add_to(map_osm)
-                    folium.PolyLine(locations=station1_to_dest, color='cornflowerblue', weight=8).add_to(map_osm)
-
-                    df_locations = pd.DataFrame(origin_to_station1 + station1_to_dest, columns=['Latitude', 'Longitude'])
-                    df0 = df_locations.to_json(orient='records')
-                    station_coords = [near_station1_coords[0], near_station1_coords[1]]
-                    df_coords = pd.DataFrame([station_coords], columns=['Latitude', 'Longitude'])
-                    map_osm.save("templates/hroute.html")
-                    return map_osm
-
-            if Fuel_at_nearest_stations_2m1 > Fuel_range_req_from_nearest_stations2:
-                print("The Fuel_at_nearest_stations_2m1 ", Fuel_at_nearest_stations_2m1)
-                print("The Fuel_range_req_from_nearest_stations2 ", Fuel_range_req_from_nearest_stations2)              
-
-                origin_to_station2 = get_here_directions(origin_coords, near_station2_coords, here_api_key)
-                station2_to_dest = get_here_directions(near_station2_coords, dest_coords, here_api_key)
-
-                if origin_to_station2 and station2_to_dest:
-                    map_osm = folium.Map(location=origin_coords, zoom_start=6)
-                    folium.Marker(location=origin_coords, icon=folium.Icon(color='blue'), popup=f"Origin: {origin_city}").add_to(map_osm)
-                    folium.Marker(location=near_station2_coords, icon=folium.Icon(color='pink'), popup=f"Station 2: {b1}").add_to(map_osm)
-                    folium.Marker(location=dest_coords, icon=folium.Icon(color='blue'), popup=f"Destination: {destination_city}").add_to(map_osm)
-
-                    folium.PolyLine(locations=origin_to_station2, color='cornflowerblue', weight=8).add_to(map_osm)
-                    folium.PolyLine(locations=station2_to_dest, color='cornflowerblue', weight=8).add_to(map_osm)
-
-                    df_locations = pd.DataFrame(origin_to_station2 + station2_to_dest, columns=['Latitude', 'Longitude'])
-                    df0 = df_locations.to_json(orient='records')
-                    station_coords = [near_station2_coords[0], near_station2_coords[1]]
-                    df_coords = pd.DataFrame([station_coords], columns=['Latitude', 'Longitude'])
-                    map_osm.save("templates/hroute.html")
-                    return map_osm
-
-            if ((Fuel_at_nearest_stations_2m + Fuel_at_nearest_stations_1m) > Fuel_req_from_nearest_stations2) & (Fuel_range_at_nearest_stations1 != 0):
-                print("The Fuel_at_nearest_stations_2m and 1m ", (Fuel_at_nearest_stations_2m + Fuel_at_nearest_stations_1m))
-                print("The Fuel_req_from_nearest_stations2 ", Fuel_req_from_nearest_stations2)
-
-                origin_to_station1 = get_here_directions(origin_coords, near_station1_coords, here_api_key)
-                station1_to_station2 = get_here_directions(near_station1_coords, near_station2_coords, here_api_key)
-                station2_to_dest = get_here_directions(near_station2_coords, dest_coords, here_api_key)
-
-                if origin_to_station1 and station1_to_station2 and station2_to_dest:
-                    map_osm = folium.Map(location=origin_coords, zoom_start=6)
-                    folium.Marker(location=origin_coords, icon=folium.Icon(color='blue'), popup=f"Origin: {origin_city}").add_to(map_osm)
-                    folium.Marker(location=near_station1_coords, icon=folium.Icon(color='pink'), popup=f"Station 1: {a1}").add_to(map_osm)
-                    folium.Marker(location=near_station2_coords, icon=folium.Icon(color='pink'), popup=f"Station 2: {b1}").add_to(map_osm)
-                    folium.Marker(location=dest_coords, icon=folium.Icon(color='blue'), popup=f"Destination: {destination_city}").add_to(map_osm)
-
-                    folium.PolyLine(locations=origin_to_station1, color='cornflowerblue', weight=8).add_to(map_osm)
-                    folium.PolyLine(locations=station1_to_station2, color='cornflowerblue', weight=8).add_to(map_osm)
-                    folium.PolyLine(locations=station2_to_dest, color='cornflowerblue', weight=8).add_to(map_osm)
-
-                    df_locations = pd.DataFrame(origin_to_station1 + station1_to_station2 + station2_to_dest, columns=['Latitude', 'Longitude'])
-                    df0 = df_locations.to_json(orient='records')
-                    station_coords = [(near_station1_coords[0], near_station1_coords[1]), (near_station2_coords[0], near_station2_coords[1])]
-                    df_coords = pd.DataFrame(station_coords, columns=['Latitude', 'Longitude'])
-                    map_osm.save("templates/hroute.html")
-                    return map_osm
-
-    with open("templates/hroute.html", "w") as f:
-        f.write("<html><head><title>No Route Found</title></head><body><h1 style='text-align: center; color: aliceblue;'>No suitable route found with the given fuel range.</h1></body></html>")
-
-    print("No suitable route found with the given fuel range.")
-    
-    return None
-
-# Example usage
-
-def getdatah(orgc,dstc,fcmspt,feff,fuorgn,fuelrng1,fuelrng2):
-    origin_city = orgc
-    Fuel_range_at_origin = fuorgn
-    destination_city = dstc
-    Fuel_range_at_nearest_stations1 = fuelrng1
-    Fuel_range_at_nearest_stations2 = fuelrng2
-    Fuel_Efficiency = feff
-    fuel_consumption = fcmspt
-    launch_all(origin_city, Fuel_range_at_origin, destination_city, fuel_consumption, Fuel_range_at_nearest_stations1, Fuel_range_at_nearest_stations2)

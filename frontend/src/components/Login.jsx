@@ -159,7 +159,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-header">
           <img src={logoViolet} alt="Logo" className="login-logo" />
-          <h1 className="login-title">{isSignup ? 'Create Account' : 'Welcome Back'}</h1>
+          <h1 className="login-title">{isSignup ? 'Create Account' : ''}</h1>
         </div>
         
         {error && <div className="error-message">{error}</div>}

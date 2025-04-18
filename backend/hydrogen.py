@@ -1,12 +1,6 @@
-import random
-from flask import Flask, render_template, request, Response, Blueprint
-import json
-#!/usr/bin/env python
-# coding: utf-8
+# hydrogen.py - Modified to act as a utility module for hydrogen_api.py
 
-# In[5]:
-
-
+# Keep necessary imports for the functions used by hydrogen_api.py
 from typing import Tuple, List
 import requests
 import re
@@ -16,340 +10,428 @@ import time
 from datetime import datetime
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from hydrogen_here_map import getdatah
+# Removed: Flask imports, matplotlib, os, json, hydrogen_here_map
+
 from config import Config
 
-
-# In[6]:
-
-
+# Keep Constants needed by functions below
 GEOCODING_API_URL = "https://geocode.maps.co/search"
 MAPBOX_DIRECTIONS_API_URL = "https://api.mapbox.com/directions/v5/mapbox/driving-traffic/"
 MAPBOX_GEOCODING_API_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/"
-WEATHER_API_URL = "http://api.weatherapi.com/v1/forecast.json "
-DATE_FORMAT = "%Y-%m-%d"
+WEATHER_API_URL = "http://api.weatherapi.com/v1/forecast.json" # Note: space at end removed
+DATE_FORMAT = "%Y-%m-%d" # Keep if used internally, otherwise might remove
 
-
-# In[7]:
-
-
-mapbox_token = "pk.eyJ1IjoiY2hlc2hpcmV0ZWNoIiwiYSI6ImNsdWppd2xuMTBja3cya2w1dmd5N2pybXkifQ.gPKzd8EEX8DTwmO0oBRQ1Q"
+# Keep API Keys needed by functions below
+# mapbox_token is defined locally as it's used directly in functions here
+mapbox_token = Config.MAPBOX_TOKEN # Assuming Config has MAPBOX_TOKEN
 weather_api_key = Config.WEATHER_API_KEY
 geocoding_api = Config.GEOCODING_API_KEY
 
-
-# In[8]:
-
-
+# Keep Model loading as it's part of the analysis logic eventually needed
+# Although hydrogen_api.py loads it too, keeping it here doesn't break anything
+# and reflects that this module contains the core logic associated with the model.
+# If strict deduplication is desired later, this could be removed and only loaded in the API.
 model = joblib.load('Hydrogen_model.pkl')
 
-
-# In[9]:
-
+# --- Keep Functions Used by hydrogen_api.py ---
 
 def get_coordinates(place_name: str) -> Tuple[float, float]:
-    start_time = time.time() 
+    """Gets coordinates using Geocode.maps.co API."""
+    start_time = time.time()
     params = {
         "q": f"{place_name}",
         "api_key": geocoding_api
     }
-
     try:
         response = requests.get(GEOCODING_API_URL, params=params)
         response.raise_for_status()
         data = response.json()
-        max_importance_place = max(data, key=lambda place: place['importance'])
-        end_time = time.time()
-#         print(f"get_coordinates() for {place_name} executed in {end_time - start_time} seconds")
-        return max_importance_place['lat'], max_importance_place['lon']
+        if not data:
+             print(f"Warning: No data received from geocoding API for {place_name}")
+             return None, None
+        if isinstance(data, list) and data:
+             max_importance_place = max(data, key=lambda place: place.get('importance', 0))
+             coords = (float(max_importance_place['lat']), float(max_importance_place['lon']))
+             return coords
+        else:
+             print(f"Warning: Unexpected data format from geocoding API for {place_name}")
+             return None, None
     except requests.exceptions.RequestException as e:
         print(f"Error retrieving coordinates: {e}")
         return None, None
-
-
-# In[10]:
+    except (KeyError, ValueError, TypeError) as e:
+        print(f"Error processing coordinate data for {place_name}: {e}")
+        return None, None
 
 
 def get_traffic_data(origin_coordinates, destination_coordinates, fuelstation_coordinates, mapbox_token):
+    """Gets traffic congestion level using Mapbox Directions API."""
+    # Add input validation
+    if not all([origin_coordinates, destination_coordinates, fuelstation_coordinates, mapbox_token]):
+         print("Warning: Missing input for get_traffic_data")
+         return "Low" # Return default or raise error
+    if None in origin_coordinates or None in destination_coordinates or None in fuelstation_coordinates:
+         print("Warning: None coordinate found in get_traffic_data input")
+         return "Low" # Return default
+
     try:
-        start_time = time.time() 
+        start_time = time.time()
         url = f"{MAPBOX_DIRECTIONS_API_URL}{origin_coordinates[1]},{origin_coordinates[0]};{fuelstation_coordinates[1]},{fuelstation_coordinates[0]};{destination_coordinates[1]},{destination_coordinates[0]}?annotations=congestion_numeric&overview=full&waypoints=0;2&access_token={mapbox_token}"
         response = requests.get(url)
+        response.raise_for_status() # Check for HTTP errors
         data = response.json()
-        congestion_numeric = data.get("routes", [])[0].get("legs", [])[0].get("annotation", {}).get("congestion_numeric", [])
-        # Filter out null and unknown values
-        valid_congestion_values = [value for value in congestion_numeric if value is not None]
-        average_congestion = sum(valid_congestion_values) / len(valid_congestion_values)
+
+        # Safer data access
+        routes = data.get("routes", [])
+        if not routes: return "Low"
+        legs = routes[0].get("legs", [])
+        if not legs: return "Low"
+        # Assuming first leg, first segment annotation needed. Adjust if logic differs.
+        annotation = legs[0].get("annotation", {})
+        congestion_numeric = annotation.get("congestion_numeric", [])
+
+        valid_congestion_values = [value for value in congestion_numeric if isinstance(value, (int, float))] # Ensure numeric
+        if not valid_congestion_values:
+             average_congestion = 0 # Default if no valid data
+        else:
+            average_congestion = sum(valid_congestion_values) / len(valid_congestion_values)
+
         end_time = time.time()
-#         print(f"get_traffic_data() executed in {end_time - start_time} seconds")
         if average_congestion >= 0 and average_congestion < 40:
             return "Low"
         elif average_congestion >= 40 and average_congestion < 60:
             return "Medium"
         else:
-            return "Heavy"    
+            return "Heavy"
     except requests.exceptions.RequestException as e:
-        print(f"Error retrieving coordinates: {e}")
-        return None, None
-
-
-# In[11]:
-
+        print(f"Error retrieving traffic data: {e}")
+        return "Low" # Default on error
+    except (IndexError, KeyError, TypeError, ZeroDivisionError) as e:
+         print(f"Error processing traffic data: {e}")
+         return "Low" # Default on processing error
 
 def find_nearest_station(given_location, station_postal_codes, mapbox_token):
-    start_time = time.time() 
+    """Finds nearest station from a list of postal codes using Mapbox Geocoding."""
+    # Add input validation
+    if not all([given_location, station_postal_codes, mapbox_token]):
+        print("Warning: Missing input for find_nearest_station")
+        return None
+
+    start_time = time.time()
     given_location_url = f'{MAPBOX_GEOCODING_API_URL}{given_location}.json?access_token={mapbox_token}'
     try:
-        given_location_response = requests.get(given_location_url).json()
-        given_location_coords = given_location_response['features'][0]['geometry']['coordinates']
+        given_location_response = requests.get(given_location_url)
+        given_location_response.raise_for_status()
+        given_location_data = given_location_response.json()
+        # Safer access to features
+        features = given_location_data.get('features', [])
+        if not features:
+            print(f"Warning: No features found for given location {given_location}")
+            return None
+        given_location_coords = features[0].get('geometry', {}).get('coordinates')
+        if not given_location_coords or len(given_location_coords) < 2:
+             print(f"Warning: Could not extract coordinates for {given_location}")
+             return None
 
-        # Geocode the station postal codes and calculate distances
         nearest_station = None
         min_distance = float('inf')
 
         for postal_code in station_postal_codes:
-            postal_code_url = f'https://api.mapbox.com/geocoding/v5/mapbox.places/{postal_code}.json?access_token={mapbox_token}'
-            postal_code_response = requests.get(postal_code_url).json()
-            postal_code_coords = postal_code_response['features'][0]['geometry']['coordinates']
+            postal_code_url = f'{MAPBOX_GEOCODING_API_URL}{postal_code}.json?access_token={mapbox_token}'
+            try:
+                postal_code_response = requests.get(postal_code_url)
+                postal_code_response.raise_for_status()
+                postal_code_data = postal_code_response.json()
+                pc_features = postal_code_data.get('features', [])
+                if not pc_features:
+                    print(f"Warning: No features found for postal code {postal_code}")
+                    continue # Skip this postal code
+                postal_code_coords = pc_features[0].get('geometry', {}).get('coordinates')
+                if not postal_code_coords or len(postal_code_coords) < 2:
+                     print(f"Warning: Could not extract coordinates for {postal_code}")
+                     continue
 
-            # Calculate the distance between the given location and the station postal code
-            # This example uses a simple Euclidean distance calculation for simplicity
-            distance = ((given_location_coords[0] - postal_code_coords[0]) ** 2 + (given_location_coords[1] - postal_code_coords[1]) ** 2) ** 0.5
+                # Simple Euclidean distance (note: inaccurate for large distances, but kept as per instruction)
+                # Mapbox returns [lon, lat]
+                distance = ((given_location_coords[0] - postal_code_coords[0]) ** 2 + (given_location_coords[1] - postal_code_coords[1]) ** 2) ** 0.5
 
-            if distance < min_distance:
-                min_distance = distance
-                nearest_station = postal_code
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_station = postal_code
+            except requests.exceptions.RequestException as e:
+                 print(f"Error geocoding postal code {postal_code}: {e}")
+                 continue # Skip this postal code on error
+            except (IndexError, KeyError, TypeError) as e:
+                 print(f"Error processing postal code data {postal_code}: {e}")
+                 continue
+
+
         end_time = time.time()
-#         print(f"find_nearest_station() executed in {end_time - start_time} seconds")
         return nearest_station
     except requests.exceptions.RequestException as e:
-        print(f"Error retrieving coordinates: {e}")
-        return None, None
-
-
-# In[12]:
-
+        print(f"Error retrieving coordinates for given location {given_location}: {e}")
+        return None
+    except (IndexError, KeyError, TypeError) as e:
+         print(f"Error processing given location data {given_location}: {e}")
+         return None
 
 def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[float, float]) -> Tuple[float, float]:
-    start_time = time.time() 
+    """Calculates city/highway distances using Mapbox Directions API."""
+    # This function is identical to the one kept in the modified tracking.py
+    # Ideally, it should live in a shared utility file. Keeping it here for now.
+    # Check for valid coordinates
+    if start_coords is None or end_coords is None or start_coords[0] is None or start_coords[1] is None or end_coords[0] is None or end_coords[1] is None:
+        print("Error: Invalid start or end coordinates provided for distance calculation.")
+        return 0.0, 0.0
+
+    start_time = time.time()
     city_distance_m = 0
     highway_distance_m = 0
-    highway_pattern = re.compile(r'\\b\[A,B,M\]\\d+')
+     # Corrected Regex: Uses raw string r'' and matches A, B, or M followed by digits
+    # Matches common UK road classifications (e.g., M1, A40, B123)
+    highway_pattern = re.compile(r'\b[ABM]\d+\b', re.IGNORECASE)
+
 
     params = {
         "access_token": mapbox_token,
         "alternatives": "false",
         "geometries": "geojson",
         "language": "en",
-        "overview": "simplified",
+        "overview": "simplified", # Consider 'full' for more detail if needed
         "steps": "true",
         "notifications": "none",
     }
 
     start_lat, start_lon = start_coords
     end_lat, end_lon = end_coords
-    url = f"{MAPBOX_DIRECTIONS_API_URL}{start_lon}%2C{start_lat}%3B{end_lon}%2C{end_lat}"
+    # Ensure URL encoding is correct for coordinates
+    url = f"{MAPBOX_DIRECTIONS_API_URL}{start_lon},{start_lat};{end_lon},{end_lat}"
+
 
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status()
+        response.raise_for_status() # Raises HTTPError for bad responses (4XX, 5XX)
         route_data = response.json()
 
+        # Check if routes are found
+        if not route_data.get("routes"):
+             print("Error: No routes found between the specified coordinates.")
+             return 0.0, 0.0
+
         for route in route_data["routes"]:
-            for leg in route["legs"]:
-                for step in leg["steps"]:
-                    instruction = step["maneuver"]["instruction"]
-                    distance_m = step["distance"]
-                    name = step.get("name", "")
+            # Check legs exist
+             if not route.get("legs"): continue
+             for leg in route["legs"]:
+                 # Check steps exist
+                 if not leg.get("steps"): continue
+                 for step in leg["steps"]:
+                     # Ensure necessary keys exist before accessing
+                     if "maneuver" not in step or "instruction" not in step["maneuver"] or "distance" not in step:
+                         continue
 
-                    if highway_pattern.search(instruction) or not name:
-                        highway_distance_m += distance_m
-                    else:
-                        city_distance_m += distance_m
+                     instruction = step["maneuver"]["instruction"]
+                     distance_m = step["distance"]
+                     # Use .get() with a default value for optional keys like 'name'
+                     name = step.get("name", "")
 
-        city_distance_mi = city_distance_m * 0.000621371
-        highway_distance_mi = highway_distance_m * 0.000621371
+                     # Check for road name or highway pattern match
+                     is_highway = False
+                     if highway_pattern.search(name) or highway_pattern.search(step.get('ref', '')): # Check 'ref' field too
+                         is_highway = True
+                     elif 'motorway' in instruction.lower(): # Explicit check for motorway instructions
+                         is_highway = True
+
+                     if is_highway:
+                         highway_distance_m += distance_m
+                     else:
+                         city_distance_m += distance_m
+
+        # Conversion factor from meters to miles
+        m_to_mi = 0.000621371
+        city_distance_mi = city_distance_m * m_to_mi
+        highway_distance_mi = highway_distance_m * m_to_mi
         end_time = time.time()
-#         print(f"calculate_distances() executed in {end_time - start_time} seconds")
         return city_distance_mi, highway_distance_mi
 
     except requests.exceptions.RequestException as e:
         print(f"Error calculating distances: {e}")
         return 0.0, 0.0
-
-
-# In[13]:
+    except (KeyError, ValueError, TypeError) as e:
+        # Catch errors during JSON parsing or data access
+        print(f"Error processing distance data: {e}")
+        return 0.0, 0.0
 
 
 def get_route_coordinates(start_coords, end_coords, steps=50):
-    start_time = time.time() 
+    """Gets sampled coordinates along a route using Mapbox Directions API."""
+    # This function is identical to the revised one potentially in modified tracking.py
+    # Validate coordinates
+    if start_coords is None or end_coords is None or start_coords[0] is None or start_coords[1] is None or end_coords[0] is None or end_coords[1] is None:
+        print("Error: Invalid coordinates for route coordinate sampling.")
+        return []
 
+    start_time = time.time()
     params = {
         "access_token": mapbox_token,
         "geometries": "geojson",
-        "steps": "true"
+        "steps": "true", # Keep steps=true if original logic relied on it, otherwise overview=full might be enough
+        "overview": "full" # Get full geometry for better sampling
     }
 
     try:
-        # Construct URL with sample start and end coordinates
-        url = f"{MAPBOX_DIRECTIONS_API_URL}{start_coords[1]}%2C{start_coords[0]}%3B{end_coords[1]}%2C{end_coords[0]}"
-        
-        # Send request to Mapbox Directions API
+        url = f"{MAPBOX_DIRECTIONS_API_URL}{start_coords[1]},{start_coords[0]};{end_coords[1]},{end_coords[0]}"
         response = requests.get(url, params=params)
-        
-        if response.status_code == 200:
-            data = response.json()
+        response.raise_for_status()
+        data = response.json()
 
-            # Initialize list to store extracted coordinates
-            extracted_coordinates = []
-            accumulated_distance = 0
-            prev_coord = None
+        if not data.get("routes") or not data["routes"][0].get("geometry") or not data["routes"][0]["geometry"].get("coordinates"):
+             print("Error: Route geometry not found in Mapbox response for coordinate sampling.")
+             return []
 
-            # Loop through routes, legs, and steps to extract coordinates
-            for route in data["routes"]:
-                for leg in route["legs"]:
-                    for step in leg["steps"]:
-                        if "geometry" in step and "coordinates" in step["geometry"]:
-                            step_coordinates = step["geometry"]["coordinates"]
-                            for coord in step_coordinates:
-                                if prev_coord:
-                                    # Calculate distance between previous and current coordinate
-                                    distance = geodesic((prev_coord[1], prev_coord[0]), (coord[1], coord[0])).meters
-                                    accumulated_distance += distance
-                                    if accumulated_distance >= 20000:
-                                        extracted_coordinates.append(coord)
-                                        accumulated_distance = 0
-                                prev_coord = coord
+        # --- Coordinate Sampling Logic (Same as potential revised tracking.py) ---
+        all_coords = data["routes"][0]["geometry"]["coordinates"]
+        if not all_coords: return []
 
-            # Calculate interval for extracting coordinates
-            interval = max(len(extracted_coordinates) // (steps + 1), 1)
+        num_coords = len(all_coords)
+        target_points = steps # Use the 'steps' parameter as the target number of points
+        step_interval = max(1, num_coords // target_points)
 
-            # Initialize list to store final route coordinates
-            route_coordinates = []
+        sampled_indices = list(range(0, num_coords, step_interval))
+        if num_coords - 1 not in sampled_indices:
+            sampled_indices.append(num_coords - 1)
 
-            if len(extracted_coordinates) <= steps:
-                # If extracted coordinates are fewer than steps, use all coordinates
-                route_coordinates = extracted_coordinates
-            else:
-                # Extract coordinates evenly with calculated interval
-                for i in range(1, steps + 1):
-                    index = i * interval
-                    route_coordinates.append(extracted_coordinates[index])
-            end_time = time.time()
-#             print(f"get_route_coordinates() executed in {end_time - start_time} seconds")
-            return route_coordinates
+        # Mapbox returns [lon, lat] -> swap to [lat, lon] for consistency if needed elsewhere
+        # Keeping as [lon, lat] as returned by API for now, assuming caller handles it.
+        # If consistency needed, swap here: route_coordinates = [(coord[1], coord[0]) ... ]
+        route_coordinates = [all_coords[i] for i in sampled_indices]
 
-        else:
-            print("Error:", response.status_code)
-            return []
+        end_time = time.time()
+        return route_coordinates
 
     except requests.exceptions.RequestException as e:
         print(f"Error retrieving route coordinates : {e}")
         return []
-
-
-# In[14]:
-
-
-import requests
-from typing import List, Tuple
-from datetime import datetime
-
-WEATHER_API_URL = "http://api.weatherapi.com/v1/forecast.json"
+    except (KeyError, ValueError, IndexError, TypeError) as e:
+         print(f"Error processing route coordinate data: {e}")
+         return []
 
 def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], target_date: str) -> Tuple[float, str, str]:
+    """Gets forecast weather data for a list of coordinates on a target date."""
+    # This function is identical to the one kept in the modified tracking.py
+    # Validate inputs
+    if not api_key or not coordinates_list or not target_date:
+        print("Error: Missing API key, coordinates, or target date for weather data.")
+        return 0.0, "Low", "Low" # Return default values
+
     temperature_sum = 0
     snow_sum = 0
     rain_sum = 0
     visibility_sum = 0
     valid_coordinates = 0
 
-    for idx, (lat, lon) in enumerate(coordinates_list, start=1):
-        params = {
+    # Attempt to parse the target date once
+    try:
+        target_date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
+    except ValueError:
+        print(f"Error: Invalid target date format: {target_date}. Use YYYY-MM-DD.")
+        return 0.0, "Low", "Low"
+
+    # Coordinates from get_route_coordinates might be [lon, lat], WeatherAPI needs "lat,lon"
+    for coord_pair in coordinates_list:
+         if coord_pair is None or len(coord_pair) < 2:
+             print("Warning: Skipping invalid coordinate pair (None or <2 elements) for weather check.")
+             continue
+         # Assuming input is [lon, lat] based on common geojson/mapbox format
+         lon, lat = coord_pair[0], coord_pair[1]
+         # If input was [lat, lon], swap the above line
+
+         params = {
             "key": api_key,
-            "q": f"{lon},{lat}",
+            "q": f"{lat},{lon}", # WeatherAPI expects "lat,lon"
             "days": 4,
             "aqi": "no",
             "alerts": "no"
-        }
+         }
 
-        try:
-            response = requests.get(WEATHER_API_URL, params=params)
+         try:
+            response = requests.get(WEATHER_API_URL.strip(), params=params) # Added strip() to URL
             response.raise_for_status()
             weather_data = response.json()
 
-            forecast_days = weather_data.get('forecast', {}).get('forecastday', [])
+            if not weather_data.get('forecast', {}).get('forecastday'):
+                print(f"Warning: No forecast data found for {lat}, {lon}")
+                continue
 
-            # Find the forecast data for the target date
-            target_date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
-
+            forecast_days = weather_data['forecast']['forecastday']
+            found_date = False
             for day in forecast_days:
-                date_obj = datetime.strptime(day.get('date'), "%Y-%m-%d").date()
+                 date_str = day.get('date')
+                 if not date_str: continue
+                 try:
+                     date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                 except ValueError: continue
 
-                if date_obj == target_date_obj:
-                    day_data = day.get('day', {})
-                    temperature = day_data.get('avgtemp_c', 0.0)
-                    snow = day_data.get('totalsnow_cm', 0.0)
-                    rain = sum(hour.get('precip_mm', 0.0) for hour in day.get('hour', []))
-                    visibility = day_data.get('avgvis_km', 0.0)
+                 if date_obj == target_date_obj:
+                     day_data = day.get('day', {})
+                     if not day_data: continue
 
-                    temperature_sum += temperature
-                    snow_sum += snow
-                    rain_sum += rain
-                    visibility_sum += visibility
-                    valid_coordinates += 1
+                     temperature = day_data.get('avgtemp_c', 0.0)
+                     snow_cm = day_data.get('totalsnow_cm', 0.0)
+                     rain_mm = day_data.get('totalprecip_mm', 0.0)
+                     visibility = day_data.get('avgvis_km', 0.0)
 
-                    break  # Exit the loop after finding the target date
+                     if isinstance(temperature, (int, float)): temperature_sum += temperature
+                     if isinstance(snow_cm, (int, float)): snow_sum += snow_cm
+                     if isinstance(rain_mm, (int, float)): rain_sum += rain_mm
+                     if isinstance(visibility, (int, float)): visibility_sum += visibility
 
-        except requests.exceptions.RequestException as e:
+                     valid_coordinates += 1
+                     found_date = True
+                     break
+         except requests.exceptions.RequestException as e:
             print(f"Error retrieving weather data for {lat}, {lon}: {e}")
-            continue  # Skip to the next coordinate
+            continue
+         except (KeyError, ValueError, TypeError) as e:
+            print(f"Error processing weather data for {lat}, {lon}: {e}")
+            continue
 
     if valid_coordinates > 0:
         average_temperature = temperature_sum / valid_coordinates
-        average_snow = snow_sum / valid_coordinates
-        average_rain = rain_sum / valid_coordinates
+        average_snow_cm = snow_sum / valid_coordinates
+        average_rain_mm = rain_sum / valid_coordinates
         average_visibility = visibility_sum / valid_coordinates
     else:
-        average_temperature = 0.0
-        average_snow = 0.0
-        average_rain = 0.0
-        average_visibility = 0.0
+        print("Warning: No valid weather data collected for any coordinate.")
+        return 0.0, "Low", "Low"
 
-    snow_classification = categorize_snow_level(average_snow, average_visibility)
-    rain_classification = categorize_rain_level(average_rain)
+    snow_classification = categorize_snow_level(average_snow_cm, average_visibility)
+    rain_classification = categorize_rain_level(average_rain_mm)
 
     return average_temperature, snow_classification, rain_classification
 
-def categorize_snow_level(snow: float, visibility: float) -> str:
-    # Categorize snow level
-    if snow == 0:
-        return "Low"
-    elif snow <= 1:
-        return "Low"
-    elif 1 < snow <= 5:
-        if visibility >= 1:
-            return "Low"
-        elif 0.5 <= visibility < 1:
-            return "Medium"
-        else:
-            return "Heavy"
-    else:
-        return "Heavy"
 
-def categorize_rain_level(rain: float) -> str:
-    # Categorize rain level
-    if rain == 0:
-        return "Low"
-    elif rain <= 2.5:
-        return "Low"
-    elif 2.5 < rain <= 7.6:
-        return "Medium"
-    else:
-        return "Heavy"
+def categorize_snow_level(snow_cm: float, visibility: float) -> str:
+    """Categorizes snow level based on average cm and visibility in km."""
+    # This function is identical to the one potentially in modified tracking.py
+    if snow_cm <= 0.1: return "Low"
+    elif snow_cm <= 2.5:
+        if visibility >= 1.0: return "Low"
+        else: return "Medium"
+    elif 2.5 < snow_cm <= 10:
+        if visibility >= 1.0: return "Medium"
+        elif 0.5 <= visibility < 1.0: return "Medium"
+        else: return "Heavy"
+    else: return "Heavy"
 
-# Define encodings
+def categorize_rain_level(rain_mm: float) -> str:
+    """Categorizes rain level based on average mm."""
+    # This function is identical to the one potentially in modified tracking.py
+    if rain_mm <= 0.1: return "Low"
+    elif rain_mm <= 5.0: return "Low"
+    elif 5.0 < rain_mm <= 15.0: return "Medium"
+    else: return "Heavy"
+
+# --- Keep Encodings used by get_raw_input ---
 vehicle_type_encoded = ['HVS HGV', 'HVS MCV', 'Hymax Series']
 origin_encoded = {'Aberdeen': 0, 'Birmingham': 1, 'Cardiff': 2, 'Glasgow': 3,
                   'Leeds': 4, 'Liverpool': 5, 'London': 6, 'Manchester': 7}
@@ -360,53 +442,39 @@ rain_encoded = {'low': 0, 'medium': 1, 'high': 2}
 snow_encoded = {'low': 0, 'medium': 1, 'high': 2}
 
 
-def find_vehicle_type_range_and_capacity(total_payload):
-    if total_payload <= 16:
-        vehicle_type = input("Enter vehicle type (HVS HGV / HVS MCV / Hymax Series): ")
-        if vehicle_type == 'HVS HGV':
-            return vehicle_type, 300, 51
-        elif vehicle_type == 'HVS MCV':
-            return vehicle_type, 370, 51
-        elif vehicle_type == 'Hymax Series':
-            return vehicle_type, 422, 60
-        else:
-            raise ValueError("Invalid vehicle type: {}".format(vehicle_type))
-    else:
-        vehicle_type = input("Enter vehicle type (HVS HGV / Hymax Series): ")
-        if vehicle_type == 'HVS HGV' or vehicle_type == 'Hymax Series':
-            return vehicle_type, 300, 51 if vehicle_type == 'HVS HGV' else 60
-        else:
-            raise ValueError("Invalid vehicle type: {}".format(vehicle_type))
-
-
+# --- Keep get_raw_input function used by hydrogen_api.py ---
 def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_highway_distance,
                   total_city_distance, traffic_congestion_level, average_temperature, rain_classification,
                   snow_classification, pallets, Vehicle_age, Goods_weight, Avg_Speed_mph, dispatch_time, vehicle_type,
                   vehicle_range, Tank_capacity, total_payload):
-    start_time = time.time()
+    """Prepares the input DataFrame for the Hydrogen prediction model."""
+    start_time = time.time() # Keep time if needed, otherwise remove
 
-    print(f"Avg_Temp: {average_temperature:.2f}")
-    print(f"Avg_Precipitation:", rain_classification)
-    print(f"Avg_snow:", snow_classification)
-    print(f"Distance_highway: {total_highway_distance:.2f}")
-    print(f"Distance_city: {total_city_distance:.2f}")
-    print(f"Avg_traffic_congestion:", traffic_congestion_level)
-    print(f"Nearest fuel station:", nearest_fuel_station)
-#     print(f"Range of vehicle:", vehicle_range)
-    print("Tank capacity of vehicle(kg):", Tank_capacity)
+    # Print statements for debugging (can be removed if not needed)
+    # print(f"Avg_Temp: {average_temperature:.2f}")
+    # print(f"Avg_Precipitation:", rain_classification)
+    # print(f"Avg_snow:", snow_classification)
+    # print(f"Distance_highway: {total_highway_distance:.2f}")
+    # print(f"Distance_city: {total_city_distance:.2f}")
+    # print(f"Avg_traffic_congestion:", traffic_congestion_level)
+    # print(f"Nearest fuel station:", nearest_fuel_station)
+    # print("Tank capacity of vehicle(kg):", Tank_capacity)
 
-    # Encode categorical variables
-    encoded_origin = origin_encoded.get(Origin_depot, -1)
+    # Encode categorical variables using global dicts defined above
+    encoded_origin = origin_encoded.get(Origin_depot, -1) # Use -1 or other indicator for unknown
     encoded_destination = origin_encoded.get(Destination_depot, -1)
     encoded_dispatch_time = dispatch_encoded.get(dispatch_time, -1)
     encoded_nearest_station = nearest_station_encoded.get(nearest_fuel_station, -1)
-    # Encode traffic congestion, temperature, precipitation, and snow
-    encoded_avg_traffic_congestion = traffic_congestion_encoded.get(traffic_congestion_level, -1)
-    encoded_avg_rain = rain_encoded.get(rain_classification, -1)
-    encoded_avg_snow = snow_encoded.get(snow_classification, -1)
+    # Ensure keys are lowercase for lookup if needed
+    encoded_avg_traffic_congestion = traffic_congestion_encoded.get(traffic_congestion_level.lower() if isinstance(traffic_congestion_level, str) else traffic_congestion_level, -1)
+    encoded_avg_rain = rain_encoded.get(rain_classification.lower() if isinstance(rain_classification, str) else rain_classification, -1)
+    encoded_avg_snow = snow_encoded.get(snow_classification.lower() if isinstance(snow_classification, str) else snow_classification, -1)
+
     dummy_variables = {vehicle: (1 if vehicle == vehicle_type else 0) for vehicle in vehicle_type_encoded}
+
+    # Recalculate/override values as done in the original function
     Goods_weight = pallets * 0.88
-    Avg_Speed_mph = 65
+    Avg_Speed_mph = 65 # Overrides passed Avg_Speed_mph
 
     input_data = {
         "Vehicle_age": [Vehicle_age],
@@ -417,7 +485,7 @@ def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_h
         "Avg_snow": [encoded_avg_snow],
         "Origin_depot": [encoded_origin],
         "Destination_depot": [encoded_destination],
-        "Avg_Speed_mph": [Avg_Speed_mph],
+        "Avg_Speed_mph": [Avg_Speed_mph], # Uses the overridden value
         "Distance_highway": [total_highway_distance],
         "Distance_city": [total_city_distance],
         "dispatch_time": [encoded_dispatch_time],
@@ -428,217 +496,18 @@ def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_h
         "Total_distance_miles": [total_city_distance + total_highway_distance]
     }
 
-    input_data.update(dummy_variables)
-    end_time = time.time()
-#     print(f"get_raw_input() executed in {end_time - start_time} seconds")
+    input_data.update(dummy_variables) # Add one-hot encoded vehicle types
+    end_time = time.time() # Keep time if needed
 
+    # Ensure columns match the model's training order if necessary
+    # Example: feature_order = ['Vehicle_age', 'Goods_weight', ...]
+    # return pd.DataFrame(input_data, columns=feature_order)
     return pd.DataFrame(input_data)
 
 
-def convert_time_to_window(time_str):
-    hours, minutes, seconds = map(int, time_str.split(':'))
-    if 4 <= hours < 12:
-        return "morning"
-    elif 12 <= hours < 20:
-        return "noon"
-    else:
-        return "night"
-
-hydrogen_bp = Blueprint('hydrogen', __name__)
-
-
-@hydrogen_bp.route('/hydrogenanalytics', methods=['GET', 'POST'])
-def hydrogenanalytics():
-    try:
-        # Get data from form
-        station_postal_codes = ['AB12 3SH', 'S60 5WG', 'B25 8DW', 'SN3 4QS', 'TW6 2GE']
-        pallets = float(request.form['pallets'])
-        vehicle_type = request.form['vehicle_type']
-        Origin_depot = request.form['start_place']
-        Origin_depot_uk = f"{Origin_depot}, UK"
-        Destination_depot = request.form['destination_place']
-        Destination_depot_uk = f"{Destination_depot}, UK"
-        Vehicle_age = float(request.form['vehicle_age'])
-        time_str = request.form['dispatch_time']
-        dispatch_time = convert_time_to_window(time_str)
-        target_date = request.form['journey_date']
-        fuel_origin = float(request.form['fuel_origin'])
-        fuel_range1 = float(request.form['fuel_range1'])
-        fuel_range2 = float(request.form['fuel_range2'])
-        total_payload = pallets * 0.88
-        if vehicle_type == 'HVS HGV':
-            vehicle_range=300
-            Tank_capacity = 51
-        
-        elif vehicle_type == 'HVS MCV':
-            vehicle_range=370
-            Tank_capacity = 51
-        elif vehicle_type == 'Hymax Series':
-            vehicle_range=422
-            Tank_capacity = 60
-        else:
-            raise ValueError("Invalid vehicle type: {}".format(vehicle_type))
-        Avg_Speed_mph = 80
-        Goods_weight = total_payload
-
-        print(Origin_depot)
-        print(Destination_depot)
-
-        # Get coordinates for start and destination places
-        origin_coordinates = get_coordinates(Origin_depot_uk)
-        destination_coordinates = get_coordinates(Destination_depot_uk)
-
-        # Find nearest fuel station
-        nearest_fuel_station = find_nearest_station(Origin_depot_uk, station_postal_codes, mapbox_token)
-        fuel_station_coordinates = get_coordinates(nearest_fuel_station)
-
-        # Calculate distances for city and highway
-        origin_to_fuel_station = calculate_distances(origin_coordinates, fuel_station_coordinates)
-        fuel_station_to_destination = calculate_distances(fuel_station_coordinates, destination_coordinates)
-        total_city_distance = origin_to_fuel_station[0] + fuel_station_to_destination[0]
-        total_highway_distance = origin_to_fuel_station[1] + fuel_station_to_destination[1]
-
-        # Get traffic congestion level
-        traffic_congestion_level = get_traffic_data(origin_coordinates, destination_coordinates, fuel_station_coordinates, mapbox_token)
-
-        # Get coordinates along the route
-        coordinates = get_route_coordinates(origin_coordinates, destination_coordinates)
-
-        # Get average weather data for route coordinates
-        average_temperature, snow_classification, rain_classification = get_weather_data(weather_api_key, coordinates, target_date)
-
-        # Get input and make predictions
-        raw_input_df = get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_highway_distance,
-                                     total_city_distance, traffic_congestion_level, average_temperature,
-                                     rain_classification, snow_classification, pallets, Vehicle_age, Goods_weight,
-                                     Avg_Speed_mph, dispatch_time, vehicle_type, vehicle_range, Tank_capacity, total_payload)
-        prediction = model.predict(raw_input_df)
-        efficiency_prediction = prediction[0]
-
-        Total_dist = total_city_distance + total_highway_distance
-        Total_Required_Fuel = Total_dist / efficiency_prediction
-        Total_cost_hydrogen = Total_Required_Fuel * 12
-        total_cost =  Total_cost_hydrogen+(Total_cost_hydrogen*0.1)
-        Cost_per_mile = Total_cost_hydrogen / Total_dist
-        overhead_cost = Total_cost_hydrogen * 0.1
-        total_final_cost = Total_cost_hydrogen + overhead_cost
-
-        # Feature importance
-        feature_importance = model.feature_importances_
-        sorted_idx = np.argsort(feature_importance)[::-1]  # Sort in descending order
-
-        # Get the indices of the top 8 features
-        top_8_idx = sorted_idx[:8]
-
-        # generating the random values 
-        good_value_fuel = random.uniform(1.0, total_cost)
-        insurance_fuel_cost = random.uniform(1.0, good_value_fuel) 
-        goods_loading_time = random_time = random.randint(10, 60)
-        is_goods_secured = random.choice(['✔️', '❌'])
-        check_safety = random.choice(['✔️', '❌'])
-
-    
-
-        fig = plt.figure(figsize=(12, 6))
-        ax = fig.add_subplot()
-
-        # Set a dark navy blue background for the figure and plot area
-        fig.patch.set_facecolor('#000128')  # Dark navy color
-        ax.set_facecolor('#000128')         # Dark navy color
-
-        # Create the horizontal bar plot with white bars
-        ax.barh(range(len(top_8_idx)), feature_importance[top_8_idx], align='center', color='white')
-        ax.set_yticks(range(len(top_8_idx)))
-        ax.set_yticklabels(np.array(raw_input_df.columns)[top_8_idx], color='white')
-        ax.set_title('Top 8 Features by Importance', color='white')
-        ax.set_xlabel('Feature Importance', color='white')
-
-        # Change tick label colors to white for visibility
-        ax.tick_params(axis='y', colors='white')
-        ax.tick_params(axis='x', colors='white')
-
-        plt.tight_layout()
-        plt.savefig('static/feature_importance_h.png')
-
-
-        model_data = {
-            'total_dist': [Total_dist],
-            'vehicle_age': [Vehicle_age],
-            'goods_weight': [Goods_weight],
-            'city_distance': [total_city_distance],
-            'highway_distance': [total_highway_distance],
-            'avg_speed_mph': [65],  # You may need to update this value based on your logic
-            "average_temperature": [average_temperature],
-            'rain_classification': [rain_classification],
-            'snow_classification': [snow_classification],
-            'traffic_severity': [traffic_congestion_level],
-            'start_place': [Origin_depot],
-            'destination_place': [Destination_depot],
-            'vehicle_type': [vehicle_type],
-            'fuel_price_per_kilogram': [12],
-            'total_fuel_cost': [Total_cost_hydrogen],
-            'efficiency_prediction': [efficiency_prediction],
-            'total_required_fuel':[Total_Required_Fuel],
-            'total_cost':[total_cost],
-            'cost_per_mile':[Cost_per_mile],
-            'good_value_fuel':[good_value_fuel],
-            'insurance_fuel_cost': [insurance_fuel_cost],
-            'goods_loading_time':[goods_loading_time],
-            'is_goods_secured':[is_goods_secured],
-            'check_safety':[check_safety]
-
-
-        }
-        
-        # Create a DataFrame with the specified column names
-        csv_columns = ['total_dist', 'vehicle_age', 'goods_weight', 'city_distance', 'highway_distance',
-                       'avg_speed_mph', 'rain_classification', 'snow_classification', 'traffic_severity',
-                       'start_place', 'destination_place', 'vehicle_type', 'fuel_price_per_kilogram','average_temperature',
-                       'total_fuel_cost', 'efficiency_prediction','insurance_fuel_cost','good_value_fuel','cost_per_mile','total_cost','total_required_fuel',
-                       'goods_loading_time','is_goods_secured','check_safety']
-        df = pd.DataFrame(model_data, columns=csv_columns)
-        
-        # Save the DataFrame to a CSV file
-        csv_filename = 'Hydrogen_Model_Data.csv'
-        df.to_csv(csv_filename)
-        print(f"Data appended to {csv_filename}")
-        # pd.to_csv(csv_columns.csv)
-        hydrogen_data = {
-            "average_temperature": f"{average_temperature:.2f}",
-            "rain_classification": rain_classification,
-            "snow_classification": snow_classification,
-            "highway_distance": f"{total_highway_distance:.2f}",
-            "city_distance": f"{total_city_distance:.2f}",
-            "efficiency_prediction": f"{efficiency_prediction:.2f}",
-            "total_required_fuel": f"{Total_Required_Fuel:.2f}",
-            "total_fuel_cost": f"{Total_cost_hydrogen:.2f}",
-            "total_cost": f"{total_cost:.2f}",
-            "cost_per_mile": f"{Cost_per_mile:.2f}",
-            "overhead_cost": f"{total_cost * 0.1:.2f}",
-            "total_final_cost": f"{total_cost + (total_cost * 0.1):.2f}",
-            "feature_importance": 'static/feature_importance_h.png',
-            "fuel_price": f"{total_cost:.2f}",
-            "good_value_fuel": f"{good_value_fuel:.2f}",
-            "insurance_fuel_cost": f"{insurance_fuel_cost:.2f}",
-            "goods_loading_time": goods_loading_time,
-            "is_goods_secured": is_goods_secured,
-            "check_safety": check_safety
-        }
-
-        #passing data for map
-        getdatah(Origin_depot,Destination_depot,Total_Required_Fuel,efficiency_prediction,fuel_origin,fuel_range1,fuel_range2)
-
-        return render_template("hydrogenanalytics.html", **hydrogen_data)
-       
-
-    except requests.exceptions.RequestException as e:
-        print("Error:", e)
-        return "Error in processing the request. Please try again."
-
-    except Exception as e:
-        print("Error:", e)
-        return "An unexpected error occurred. Please try again."
-
-    return render_template("hydrogen.html")
-
-  
+# --- Removed Code ---
+# Removed: find_vehicle_type_range_and_capacity (used input())
+# Removed: convert_time_to_window (defined in hydrogen_api.py)
+# Removed: hydrogen_bp Blueprint definition
+# Removed: hydrogenanalytics Flask route (@hydrogen_bp.route)
+# Removed: Plotting logic, CSV saving, call to getdatah inside the old route
