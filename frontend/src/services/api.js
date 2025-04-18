@@ -1,7 +1,7 @@
 //for prod
-//const API_BASE_URL = '';
+const API_BASE_URL = '';
 //for dev
-const API_BASE_URL = 'http://localhost:443';
+//const API_BASE_URL = 'http://localhost:443';
 
 async function apiRequest(url, method = 'GET', data = null) {
   const options = {

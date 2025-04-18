@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name
 # for dev only
 # !!!!!IMPORTANT!!!!!!!!
 # comment this out while pushing to github and production
-CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+# CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 # !!!!IMPORTANT!!!!!!!
 
 def init_db():
@@ -84,6 +84,6 @@ def api_status():
 # for dev only
 # !!!!!IMPORTANT!!!!!!!!
 # comment this out while pushing to github and production
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=443, debug=True)
+# if __name__ == '__main__':
+#     app.run(host='0.0.0.0', port=443, debug=True)
 # !!!!!IMPORTANT!!!!!!!!
