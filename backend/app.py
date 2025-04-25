@@ -16,6 +16,9 @@ from auth_api import auth_api_bp
 app = Flask(__name__)
 app.config.from_object(Config)  
 
+app.config['SESSION_COOKIE_NAME'] = 'viewport_session'
+app.config['SESSION_COOKIE_PATH'] = '/'  # Only accessible at root path
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')
 
 # for dev only
