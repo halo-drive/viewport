@@ -1,0 +1,64 @@
+.form-buttons {
+    position: relative;
+  }
+  
+  .processed-warning-box {
+    position: absolute;
+    bottom: -58%;
+    left: 46%;
+    transform: translateX(-50%);
+    margin-bottom: 0.75rem;
+    background-color: #b783e7;
+    color: #381c34;
+    border: 2px solid #34065f;
+    border-radius: 0.375rem;
+    padding: 0.8rem 1rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    max-width: 300px;
+    font-size: 0.9em;
+    text-align: center;
+    white-space: nowrap;
+  }
+  
+  .processed-warning-box p {
+    margin: 0.25rem 0;
+  }
+  
+  .warning-box-pointer {
+    position: absolute;
+    top: 102%;
+    margin-top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid #34065f;
+  }
+  
+  .close-warning-btn {
+      position: absolute;
+      top: 5px;
+      right: 8px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      line-height: 1;
+      color: #664d03;
+      cursor: pointer;
+      padding: 0;
+  }
+  .close-warning-btn:hover {
+      color: #000;
+  }
+  
+  .submit-btn:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+  
+  .submit-btn:not(:disabled) {
+    cursor: pointer;
+  }

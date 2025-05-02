@@ -624,3 +624,27 @@
   overflow: hidden;
 }
 
+
+/* Target the leaflet container for top-right controls */
+.leaflet-top.leaflet-right {
+  display: flex; /* Enable flexbox */
+  flex-direction: column; /* Stack items vertically */
+  /* Add gap if desired */
+  gap: 0px;
+}
+
+/* Assign order to the specific control containers */
+.leaflet-control.logout-button-container {
+  order: 1; /* Logout button appears first */
+}
+
+.leaflet-control.gps-button-container {
+  order: 2; /* GPS button appears second */
+}
+
+.leaflet-top.leaflet-right .leaflet-control {
+  margin-bottom: 0; /* Reset all margins */
+  /* Or specifically target bottom margin if preferred: */
+  /* margin-bottom: 0 !important; */
+  /* Use !important only if margin: 0 doesn't work, as Leaflet's default might be specific */
+}

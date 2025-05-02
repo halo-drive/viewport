@@ -1,0 +1,33 @@
+/* frontend/src/components/pulsatingIcon.css */
+
+@keyframes pulse {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); /* Blue color */
+    }
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
+    }
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
+    }
+  }
+  
+  .pulsating-dot {
+    background-color: rgba(0, 123, 255, 1); /* Solid blue color */
+    width: 15px; /* Adjust size as needed */
+    height: 15px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 1);
+    transform: scale(1);
+    animation: pulse 2s infinite;
+    /* Ensure the dot is centered if container size differs, though L.divIcon handles positioning */
+  }
+  
+  /* Ensure the icon is clickable */
+  .leaflet-div-icon {
+    background: none;
+    border: none;
+  }
