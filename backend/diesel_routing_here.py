@@ -1,9 +1,10 @@
 import folium
 import requests
 from geopy.distance import geodesic
-from typing import Tuple, List, Optional 
+from typing import Tuple, List, Optional
 from collections import namedtuple
 from config import Config
+from requests.exceptions import HTTPError, RequestException
 
 FORMAT_VERSION = 1
 
@@ -83,7 +84,7 @@ def iter_decode(encoded):
 def get_here_directions(origin: str, destination: str, api_key: str) -> Optional[List[Tuple[float, float]]]:
     url = f"https://router.hereapi.com/v8/routes?transportMode=car&origin={origin}&destination={destination}&return=polyline&apikey={api_key}"
     try:
-        response = requests.get(url, timeout=15) 
+        response = requests.get(url, timeout=15)
         response.raise_for_status()
         data = response.json()
         routes = data.get('routes', [])
@@ -93,12 +94,20 @@ def get_here_directions(origin: str, destination: str, api_key: str) -> Optional
                 polyline_str = sections[0].get('polyline')
                 if polyline_str:
                      decoded_route = list(iter_decode(polyline_str))
-                     return decoded_route if decoded_route else None 
-    except requests.exceptions.RequestException as e:
-         print(f"Error fetching HERE directions ({origin} -> {destination}): {e}")
+                     return decoded_route if decoded_route else None
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error fetching HERE directions ({origin} -> {destination}) (HTTPError): {http_err}")
+            return None
+    except RequestException as e:
+         print(f"Error fetching HERE directions ({origin} -> {destination}) (RequestException): {e}")
+         return None
     except (ValueError, KeyError, IndexError) as e:
          print(f"Error processing HERE directions data ({origin} -> {destination}): {e}")
-    return None 
+         return None
+    return None
 
 def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, float]]:
     url = f"https://geocode.search.hereapi.com/v1/geocode?q={place_name}&apiKey={api_key}"
@@ -111,11 +120,19 @@ def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, floa
             lat = float(location.get('lat'))
             lng = float(location.get('lng'))
             return lat, lng
-    except requests.exceptions.RequestException as e:
-         print(f"Error geocoding '{place_name}' with HERE: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error geocoding '{place_name}' with HERE (HTTPError): {http_err}")
+            return None
+    except RequestException as e:
+         print(f"Error geocoding '{place_name}' with HERE (RequestException): {e}")
+         return None
     except (ValueError, KeyError, IndexError, TypeError) as e:
          print(f"Error processing HERE geocoding data for '{place_name}': {e}")
-    return None 
+         return None
+    return None
 
 def get_fuel_station_coordinates(coords: Tuple[float, float], api_key: str) -> Optional[Tuple[float, float]]:
     base_url = 'https://discover.search.hereapi.com/v1/discover'
@@ -136,17 +153,24 @@ def get_fuel_station_coordinates(coords: Tuple[float, float], api_key: str) -> O
                  lat = float(position.get('lat'))
                  lng = float(position.get('lng'))
                  return lat, lng
-    except requests.exceptions.RequestException as e:
-         print(f"Error finding HERE fuel stations near {coords}: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error finding HERE fuel stations near {coords} (HTTPError): {http_err}")
+            return None
+    except RequestException as e:
+         print(f"Error finding HERE fuel stations near {coords} (RequestException): {e}")
+         return None
     except (ValueError, KeyError, IndexError, TypeError) as e:
          print(f"Error processing HERE fuel station data near {coords}: {e}")
-    return None 
-
+         return None
+    return None
 
 def get_route_with_fuel_stations(
     api_key: str,
     origin_coords: Tuple[float, float],
-    destination_coords: Tuple[float, float] 
+    destination_coords: Tuple[float, float]
 ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[Tuple[float, float]]]:
     print(f"Calculating route/stations from {origin_coords} to {destination_coords}")
 
@@ -160,20 +184,20 @@ def get_route_with_fuel_stations(
 
     try:
         total_distance = sum(geodesic(route_points[i], route_points[i+1]).km for i in range(len(route_points) - 1))
-    except ValueError: 
+    except ValueError:
         print("Warning: Could not calculate total distance, defaulting to 0.")
         total_distance = 0
 
-    interval_distance = total_distance / 4 if total_distance > 0 else 50 
+    interval_distance = total_distance / 4 if total_distance > 0 else 50
     fuel_station_coords = []
-    original_route_coords_list = list(route_points) 
+    original_route_coords_list = list(route_points)
 
     cumulative_distance = 0
     for i in range(1, len(route_points)):
         try:
             segment_distance = geodesic(route_points[i-1], route_points[i]).km
             cumulative_distance += segment_distance
-        except ValueError: continue 
+        except ValueError: continue
 
         if cumulative_distance >= 5:
             fuel_coords = get_fuel_station_coordinates(route_points[i], api_key)
@@ -196,6 +220,6 @@ def get_route_with_fuel_stations(
                 fuel_station_coords.append(fuel_coords)
                 print(f"Found mid-route fuel station near {route_points[i]}")
                 cumulative_distance = 0
-                last_fuel_station_index = i 
+                last_fuel_station_index = i
 
     return original_route_coords_list, route_points, fuel_station_coords

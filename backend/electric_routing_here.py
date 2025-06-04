@@ -2,9 +2,10 @@ import folium
 import requests
 import os
 from geopy.distance import geodesic
-from typing import Tuple, List, Optional 
+from typing import Tuple, List, Optional
 from collections import namedtuple
 from config import Config
+from requests.exceptions import HTTPError, RequestException
 
 api_key = Config.HERE_API_KEY
 
@@ -79,10 +80,18 @@ def get_here_directions(origin: str, destination: str, api_key: str) -> Optional
                 if polyline_str:
                      decoded_route = list(iter_decode(polyline_str))
                      return decoded_route if decoded_route else None
-    except requests.exceptions.RequestException as e:
-         print(f"Error fetching HERE directions ({origin} -> {destination}): {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error fetching HERE directions ({origin} -> {destination}) (HTTPError): {http_err}")
+            return None
+    except RequestException as e:
+         print(f"Error fetching HERE directions ({origin} -> {destination}) (RequestException): {e}")
+         return None
     except (ValueError, KeyError, IndexError) as e:
          print(f"Error processing HERE directions data ({origin} -> {destination}): {e}")
+         return None
     return None
 
 def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, float]]:
@@ -96,10 +105,18 @@ def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, floa
             lat = float(location.get('lat'))
             lng = float(location.get('lng'))
             return lat, lng
-    except requests.exceptions.RequestException as e:
-         print(f"Error geocoding '{place_name}' with HERE: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error geocoding '{place_name}' with HERE (HTTPError): {http_err}")
+            return None
+    except RequestException as e:
+         print(f"Error geocoding '{place_name}' with HERE (RequestException): {e}")
+         return None
     except (ValueError, KeyError, IndexError, TypeError) as e:
          print(f"Error processing HERE geocoding data for '{place_name}': {e}")
+         return None
     return None
 
 def get_charging_station_coordinates(coords: Tuple[float, float], api_key: str) -> Optional[Tuple[float, float]]:
@@ -121,17 +138,24 @@ def get_charging_station_coordinates(coords: Tuple[float, float], api_key: str) 
                  lat = float(position.get('lat'))
                  lng = float(position.get('lng'))
                  return lat, lng
-    except requests.exceptions.RequestException as e:
-        print(f"Error finding HERE EV stations near {coords}: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error finding HERE EV stations near {coords} (HTTPError): {http_err}")
+            return None
+    except RequestException as e:
+        print(f"Error finding HERE EV stations near {coords} (RequestException): {e}")
+        return None
     except (ValueError, KeyError, IndexError, TypeError) as e:
         print(f"Error processing HERE EV station data near {coords}: {e}")
+        return None
     return None
-
 
 def get_route_with_charging_stations(
     api_key: str,
-    origin_coords: Tuple[float, float], 
-    destination_coords: Tuple[float, float] 
+    origin_coords: Tuple[float, float],
+    destination_coords: Tuple[float, float]
 ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[Tuple[float, float]]]:
     print(f"Calculating EV route/stations from {origin_coords} to {destination_coords}")
 
@@ -149,9 +173,9 @@ def get_route_with_charging_stations(
         print("Warning: Could not calculate EV total distance, defaulting to 0.")
         total_distance = 0
 
-    interval_distance = 120 
+    interval_distance = 120
     charging_station_coords = []
-    original_route_coords_list = list(route_points) 
+    original_route_coords_list = list(route_points)
 
     cumulative_distance = 0
     for i in range(1, len(route_points)):
@@ -179,21 +203,18 @@ def get_route_with_charging_stations(
             if charging_coords and charging_coords not in charging_station_coords:
                 charging_station_coords.append(charging_coords)
                 print(f"Found mid-route EV charging station near {route_points[i]}")
-                cumulative_distance = 0 
-
+                cumulative_distance = 0
 
     if len(charging_station_coords) > 4:
          print(f"Limiting charging stations from {len(charging_station_coords)} to 4")
          if len(charging_station_coords) > 2:
              mid_indices = list(range(1, len(charging_station_coords) - 1))
-             step = max(1, len(mid_indices) // 2) 
+             step = max(1, len(mid_indices) // 2)
              kept_middle = [charging_station_coords[mid_indices[i]] for i in range(0, len(mid_indices), step)][:2]
              charging_station_coords = [charging_station_coords[0]] + kept_middle + [charging_station_coords[-1]]
-         else: 
+         else:
              charging_station_coords = [charging_station_coords[0], charging_station_coords[-1]]
 
     print(f"Final EV route using {len(charging_station_coords)} charging stations.")
 
-
     return original_route_coords_list, route_points, charging_station_coords
-

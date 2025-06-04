@@ -7,16 +7,16 @@ import time
 from datetime import datetime
 import pandas as pd
 import numpy as np
-
 from config import Config
+from requests.exceptions import HTTPError, RequestException
 
 GEOCODING_API_URL = "https://geocode.maps.co/search"
 MAPBOX_DIRECTIONS_API_URL = "https://api.mapbox.com/directions/v5/mapbox/driving-traffic/"
 MAPBOX_GEOCODING_API_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/"
-WEATHER_API_URL = "http://api.weatherapi.com/v1/forecast.json" 
-DATE_FORMAT = "%Y-%m-%d" 
+WEATHER_API_URL = "http://api.weatherapi.com/v1/forecast.json"
+DATE_FORMAT = "%Y-%m-%d"
 
-mapbox_token = Config.MAPBOX_TOKEN 
+mapbox_token = Config.MAPBOX_TOKEN
 weather_api_key = Config.WEATHER_API_KEY
 geocoding_api = Config.GEOCODING_API_KEY
 
@@ -42,8 +42,14 @@ def get_coordinates(place_name: str) -> Tuple[float, float]:
         else:
              print(f"Warning: Unexpected data format from geocoding API for {place_name}")
              return None, None
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving coordinates: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error retrieving coordinates (HTTPError): {http_err}")
+            return None, None
+    except RequestException as e:
+        print(f"Error retrieving coordinates (RequestException): {e}")
         return None, None
     except (KeyError, ValueError, TypeError) as e:
         print(f"Error processing coordinate data for {place_name}: {e}")
@@ -62,7 +68,7 @@ def get_traffic_data(origin_coordinates, destination_coordinates, fuelstation_co
         start_time = time.time()
         url = f"{MAPBOX_DIRECTIONS_API_URL}{origin_coordinates[1]},{origin_coordinates[0]};{fuelstation_coordinates[1]},{fuelstation_coordinates[0]};{destination_coordinates[1]},{destination_coordinates[0]}?annotations=congestion_numeric&overview=full&waypoints=0;2&access_token={mapbox_token}"
         response = requests.get(url)
-        response.raise_for_status() 
+        response.raise_for_status()
         data = response.json()
 
         routes = data.get("routes", [])
@@ -72,9 +78,9 @@ def get_traffic_data(origin_coordinates, destination_coordinates, fuelstation_co
         annotation = legs[0].get("annotation", {})
         congestion_numeric = annotation.get("congestion_numeric", [])
 
-        valid_congestion_values = [value for value in congestion_numeric if isinstance(value, (int, float))] 
+        valid_congestion_values = [value for value in congestion_numeric if isinstance(value, (int, float))]
         if not valid_congestion_values:
-             average_congestion = 0 
+             average_congestion = 0
         else:
             average_congestion = sum(valid_congestion_values) / len(valid_congestion_values)
 
@@ -85,12 +91,18 @@ def get_traffic_data(origin_coordinates, destination_coordinates, fuelstation_co
             return "Medium"
         else:
             return "Heavy"
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving traffic data: {e}")
-        return "Low" 
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error retrieving traffic data (HTTPError): {http_err}")
+            return "Low"
+    except RequestException as e:
+        print(f"Error retrieving traffic data (RequestException): {e}")
+        return "Low"
     except (IndexError, KeyError, TypeError, ZeroDivisionError) as e:
          print(f"Error processing traffic data: {e}")
-         return "Low" 
+         return "Low"
 
 def find_nearest_station(given_location, station_postal_codes, mapbox_token):
     if not all([given_location, station_postal_codes, mapbox_token]):
@@ -124,7 +136,7 @@ def find_nearest_station(given_location, station_postal_codes, mapbox_token):
                 pc_features = postal_code_data.get('features', [])
                 if not pc_features:
                     print(f"Warning: No features found for postal code {postal_code}")
-                    continue 
+                    continue
                 postal_code_coords = pc_features[0].get('geometry', {}).get('coordinates')
                 if not postal_code_coords or len(postal_code_coords) < 2:
                      print(f"Warning: Could not extract coordinates for {postal_code}")
@@ -135,21 +147,32 @@ def find_nearest_station(given_location, station_postal_codes, mapbox_token):
                 if distance < min_distance:
                     min_distance = distance
                     nearest_station = postal_code
-            except requests.exceptions.RequestException as e:
-                 print(f"Error geocoding postal code {postal_code}: {e}")
-                 continue 
-            except (IndexError, KeyError, TypeError) as e:
-                 print(f"Error processing postal code data {postal_code}: {e}")
+            except HTTPError as http_err_inner:
+                if http_err_inner.response is not None and http_err_inner.response.status_code == 429:
+                    raise
+                else:
+                    print(f"Error geocoding postal code {postal_code} (HTTPError): {http_err_inner}")
+                    continue
+            except RequestException as e_inner:
+                 print(f"Error geocoding postal code {postal_code} (RequestException): {e_inner}")
                  continue
-
+            except (IndexError, KeyError, TypeError) as e_inner:
+                 print(f"Error processing postal code data {postal_code}: {e_inner}")
+                 continue
 
         end_time = time.time()
         return nearest_station
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving coordinates for given location {given_location}: {e}")
+    except HTTPError as http_err_outer:
+        if http_err_outer.response is not None and http_err_outer.response.status_code == 429:
+            raise
+        else:
+            print(f"Error retrieving coordinates for given location {given_location} (HTTPError): {http_err_outer}")
+            return None
+    except RequestException as e_outer:
+        print(f"Error retrieving coordinates for given location {given_location} (RequestException): {e_outer}")
         return None
-    except (IndexError, KeyError, TypeError) as e:
-         print(f"Error processing given location data {given_location}: {e}")
+    except (IndexError, KeyError, TypeError) as e_outer:
+         print(f"Error processing given location data {given_location}: {e_outer}")
          return None
 
 def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[float, float]) -> Tuple[float, float]:
@@ -162,13 +185,12 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
     highway_distance_m = 0
     highway_pattern = re.compile(r'\b[ABM]\d+\b', re.IGNORECASE)
 
-
     params = {
         "access_token": mapbox_token,
         "alternatives": "false",
         "geometries": "geojson",
         "language": "en",
-        "overview": "simplified", 
+        "overview": "simplified",
         "steps": "true",
         "notifications": "none",
     }
@@ -177,10 +199,9 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
     end_lat, end_lon = end_coords
     url = f"{MAPBOX_DIRECTIONS_API_URL}{start_lon},{start_lat};{end_lon},{end_lat}"
 
-
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status() 
+        response.raise_for_status()
         route_data = response.json()
 
         if not route_data.get("routes"):
@@ -200,9 +221,9 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
                      name = step.get("name", "")
 
                      is_highway = False
-                     if highway_pattern.search(name) or highway_pattern.search(step.get('ref', '')): 
+                     if highway_pattern.search(name) or highway_pattern.search(step.get('ref', '')):
                          is_highway = True
-                     elif 'motorway' in instruction.lower(): 
+                     elif 'motorway' in instruction.lower():
                          is_highway = True
 
                      if is_highway:
@@ -215,14 +236,18 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
         highway_distance_mi = highway_distance_m * m_to_mi
         end_time = time.time()
         return city_distance_mi, highway_distance_mi
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error calculating distances: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error calculating distances (HTTPError): {http_err}")
+            return 0.0, 0.0
+    except RequestException as e:
+        print(f"Error calculating distances (RequestException): {e}")
         return 0.0, 0.0
     except (KeyError, ValueError, TypeError) as e:
         print(f"Error processing distance data: {e}")
         return 0.0, 0.0
-
 
 def get_route_coordinates(start_coords, end_coords, steps=50):
     if start_coords is None or end_coords is None or start_coords[0] is None or start_coords[1] is None or end_coords[0] is None or end_coords[1] is None:
@@ -233,8 +258,8 @@ def get_route_coordinates(start_coords, end_coords, steps=50):
     params = {
         "access_token": mapbox_token,
         "geometries": "geojson",
-        "steps": "true", 
-        "overview": "full" 
+        "steps": "true",
+        "overview": "full"
     }
 
     try:
@@ -251,7 +276,7 @@ def get_route_coordinates(start_coords, end_coords, steps=50):
         if not all_coords: return []
 
         num_coords = len(all_coords)
-        target_points = steps 
+        target_points = steps
         step_interval = max(1, num_coords // target_points)
 
         sampled_indices = list(range(0, num_coords, step_interval))
@@ -262,9 +287,14 @@ def get_route_coordinates(start_coords, end_coords, steps=50):
 
         end_time = time.time()
         return route_coordinates
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving route coordinates : {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error retrieving route coordinates (HTTPError): {http_err}")
+            return []
+    except RequestException as e:
+        print(f"Error retrieving route coordinates (RequestException): {e}")
         return []
     except (KeyError, ValueError, IndexError, TypeError) as e:
          print(f"Error processing route coordinate data: {e}")
@@ -273,7 +303,7 @@ def get_route_coordinates(start_coords, end_coords, steps=50):
 def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], target_date: str) -> Tuple[float, str, str]:
     if not api_key or not coordinates_list or not target_date:
         print("Error: Missing API key, coordinates, or target date for weather data.")
-        return 0.0, "Low", "Low" 
+        return 0.0, "Low", "Low"
 
     temperature_sum = 0
     snow_sum = 0
@@ -295,14 +325,14 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
 
          params = {
             "key": api_key,
-            "q": f"{lat},{lon}", 
+            "q": f"{lat},{lon}",
             "days": 4,
             "aqi": "no",
             "alerts": "no"
          }
 
          try:
-            response = requests.get(WEATHER_API_URL.strip(), params=params) 
+            response = requests.get(WEATHER_API_URL.strip(), params=params)
             response.raise_for_status()
             weather_data = response.json()
 
@@ -336,11 +366,17 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
                      valid_coordinates += 1
                      found_date = True
                      break
-         except requests.exceptions.RequestException as e:
-            print(f"Error retrieving weather data for {lat}, {lon}: {e}")
+         except HTTPError as http_err_inner:
+            if http_err_inner.response is not None and http_err_inner.response.status_code == 429:
+                raise
+            else:
+                print(f"Error retrieving weather data for {lat}, {lon} (HTTPError): {http_err_inner}")
+                continue
+         except RequestException as e_inner:
+            print(f"Error retrieving weather data for {lat}, {lon} (RequestException): {e_inner}")
             continue
-         except (KeyError, ValueError, TypeError) as e:
-            print(f"Error processing weather data for {lat}, {lon}: {e}")
+         except (KeyError, ValueError, TypeError) as e_inner:
+            print(f"Error processing weather data for {lat}, {lon}: {e_inner}")
             continue
 
     if valid_coordinates > 0:
@@ -389,7 +425,7 @@ def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_h
                   total_city_distance, traffic_congestion_level, average_temperature, rain_classification,
                   snow_classification, pallets, Vehicle_age, Goods_weight, Avg_Speed_mph, dispatch_time, vehicle_type,
                   vehicle_range, Tank_capacity, total_payload):
-    start_time = time.time() 
+    start_time = time.time()
 
     encoded_origin = origin_encoded.get(Origin_depot, -1)
     encoded_destination = origin_encoded.get(Destination_depot, -1)
@@ -402,7 +438,7 @@ def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_h
     dummy_variables = {vehicle: (1 if vehicle == vehicle_type else 0) for vehicle in vehicle_type_encoded}
 
     Goods_weight = pallets * 0.88
-    Avg_Speed_mph = 65 
+    Avg_Speed_mph = 65
 
     input_data = {
         "Vehicle_age": [Vehicle_age],
@@ -413,7 +449,7 @@ def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_h
         "Avg_snow": [encoded_avg_snow],
         "Origin_depot": [encoded_origin],
         "Destination_depot": [encoded_destination],
-        "Avg_Speed_mph": [Avg_Speed_mph], 
+        "Avg_Speed_mph": [Avg_Speed_mph],
         "Distance_highway": [total_highway_distance],
         "Distance_city": [total_city_distance],
         "dispatch_time": [encoded_dispatch_time],
@@ -424,7 +460,7 @@ def get_raw_input(Origin_depot, Destination_depot, nearest_fuel_station, total_h
         "Total_distance_miles": [total_city_distance + total_highway_distance]
     }
 
-    input_data.update(dummy_variables) 
-    end_time = time.time() 
+    input_data.update(dummy_variables)
+    end_time = time.time()
 
     return pd.DataFrame(input_data)

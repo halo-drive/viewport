@@ -1,10 +1,10 @@
 from geopy.distance import geodesic
 import requests
-from geopy.geocoders import Nominatim 
+from geopy.geocoders import Nominatim
 from collections import namedtuple
-import time 
-
+import time
 from config import Config
+from requests.exceptions import HTTPError, RequestException
 
 here_api_key = Config.HERE_API_KEY
 
@@ -57,23 +57,23 @@ def decode_unsigned_values(encoded):
             result = shift = 0
         else:
             shift += 5
-            if shift > 30: 
+            if shift > 30:
                  raise ValueError("Invalid encoding. Possible corruption detected.")
     if shift > 0:
         raise ValueError('Invalid encoding. Unfinished sequence.')
 
 def iter_decode(encoded):
-    if not encoded: 
-         return iter([]) 
+    if not encoded:
+         return iter([])
 
     last_lat = last_lng = last_z = 0
     decoder = decode_unsigned_values(encoded)
     try:
         header = decode_header(decoder)
-    except ValueError as e: 
+    except ValueError as e:
          print(f"Error decoding polyline header: {e}")
          return iter([])
-    except StopIteration: 
+    except StopIteration:
          print("Error decoding polyline: No data after header.")
          return iter([])
 
@@ -84,8 +84,8 @@ def iter_decode(encoded):
         try:
             last_lat += to_signed(next(decoder))
         except StopIteration:
-            return 
-        except ValueError as e: 
+            return
+        except ValueError as e:
              print(f"Error decoding latitude delta: {e}")
              return iter([])
 
@@ -103,10 +103,9 @@ def iter_decode(encoded):
         except StopIteration:
              print("Error decoding polyline: Premature ending after latitude delta.")
              raise ValueError("Invalid encoding. Premature ending reached after latitude delta.")
-        except ValueError as e: 
+        except ValueError as e:
              print(f"Error decoding longitude/z delta: {e}")
              return iter([])
-
 
 def get_here_directions(origin, destination, api_key):
     if not all([origin, destination, api_key]):
@@ -129,22 +128,27 @@ def get_here_directions(origin, destination, api_key):
                 polyline_str = sections[0].get('polyline')
                 if polyline_str:
                     decoded_route = list(iter_decode(polyline_str))
-                    if not decoded_route: 
+                    if not decoded_route:
                          print("Warning: Polyline decoding resulted in empty list.")
                          return None
                     return decoded_route
         print("Warning: Polyline not found in HERE directions response.")
         return None
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error fetching HERE directions (HTTPError): {http_err}")
+            return None
     except requests.exceptions.Timeout:
          print(f"Error fetching HERE directions: Request timed out")
          return None
-    except requests.exceptions.RequestException as e:
-         print(f"Error fetching HERE directions: {e}")
+    except RequestException as e:
+         print(f"Error fetching HERE directions (RequestException): {e}")
          return None
     except (ValueError, KeyError, IndexError, TypeError) as e:
          print(f"Error processing HERE directions data: {e}")
          return None
-
 
 def get_coordinates(city):
     if not city: return None, None
@@ -158,13 +162,12 @@ def get_coordinates(city):
         else:
             print(f"Warning: Nominatim could not geocode city: {city}")
             return None, None
-    except Exception as e: 
+    except Exception as e:
          print(f"Error during Nominatim geocoding for {city}: {e}")
          return None, None
 
-
 def find_nearest_stations(origin_city, station_cities, destination_city):
-    print(f"Finding nearest stations: Origin={origin_city}, Dest={destination_city}") 
+    print(f"Finding nearest stations: Origin={origin_city}, Dest={destination_city}")
     if not all([origin_city, station_cities, destination_city]):
          print("Warning: Missing input for find_nearest_stations")
          return []
@@ -186,7 +189,7 @@ def find_nearest_stations(origin_city, station_cities, destination_city):
             station_coords_cache[city] = coords
     print(f"  Geocoded {len(station_coords_cache)} cities successfully.")
 
-    valid_stations = {} 
+    valid_stations = {}
 
     direction = "northbound" if dest_coords[0] > origin_coords[0] else "southbound"
     print(f"  Direction: {direction}")
@@ -200,13 +203,13 @@ def find_nearest_stations(origin_city, station_cities, destination_city):
             if distance <= 150:
                  if direction == "northbound" and coords[0] >= origin_coords[0] - 0.01:
                      is_directional = True
-                 elif direction == "southbound" and coords[0] <= origin_coords[0] + 0.01: 
+                 elif direction == "southbound" and coords[0] <= origin_coords[0] + 0.01:
                      is_directional = True
 
             if is_close_enough or is_directional:
                  valid_stations[city] = distance
 
-        except ValueError as e: 
+        except ValueError as e:
              print(f"Warning: Could not calculate distance for {city}: {e}")
 
     if not valid_stations:
@@ -216,5 +219,3 @@ def find_nearest_stations(origin_city, station_cities, destination_city):
     nearest_stations = sorted(valid_stations.items(), key=lambda item: item[1])
     print(f"  Found {len(nearest_stations)} nearest stations meeting criteria.")
     return nearest_stations
-
-

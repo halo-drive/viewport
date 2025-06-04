@@ -2,7 +2,8 @@ import requests
 import re
 from typing import Tuple, List
 from datetime import datetime
-from config import Config 
+from config import Config
+from requests.exceptions import HTTPError, RequestException
 
 GEOCODING_API_URL = "https://geocode.maps.co/search"
 MAPBOX_DIRECTIONS_API_URL = "https://api.mapbox.com/directions/v5/mapbox/driving-traffic/"
@@ -17,7 +18,6 @@ def get_coordinates(place_name: str) -> Tuple[float, float]:
         "q": f"{place_name}",
         "api_key": geocoding_api
     }
-
     try:
         response = requests.get(GEOCODING_API_URL, params=params)
         response.raise_for_status()
@@ -32,10 +32,14 @@ def get_coordinates(place_name: str) -> Tuple[float, float]:
         else:
              print(f"Error: Unexpected data format from geocoding API for {place_name}")
              return None, None
-
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving coordinates: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error retrieving coordinates (HTTPError): {http_err}")
+            return None, None
+    except RequestException as e:
+        print(f"Error retrieving coordinates (RequestException): {e}")
         return None, None
     except (KeyError, ValueError, TypeError) as e:
         print(f"Error processing coordinate data for {place_name}: {e}")
@@ -51,13 +55,12 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
     highway_distance_m = 0
     highway_pattern = re.compile(r'\b[ABM]\d+\b', re.IGNORECASE)
 
-
     params = {
         "access_token": MAPBOX_ACCESS_TOKEN,
         "alternatives": "false",
         "geometries": "geojson",
         "language": "en",
-        "overview": "simplified", 
+        "overview": "simplified",
         "steps": "true",
         "notifications": "none",
     }
@@ -66,10 +69,9 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
     end_lat, end_lon = end_coords
     url = f"{MAPBOX_DIRECTIONS_API_URL}{start_lon},{start_lat};{end_lon},{end_lat}"
 
-
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status() 
+        response.raise_for_status()
         route_data = response.json()
 
         if not route_data.get("routes"):
@@ -91,21 +93,25 @@ def calculate_distances(start_coords: Tuple[float, float], end_coords: Tuple[flo
                      is_highway = False
                      if highway_pattern.search(name) or highway_pattern.search(step.get('ref', '')):
                          is_highway = True
-                     elif 'motorway' in instruction.lower(): 
+                     elif 'motorway' in instruction.lower():
                          is_highway = True
                      if is_highway:
                          highway_distance_m += distance_m
                      else:
                          city_distance_m += distance_m
 
-
         m_to_mi = 0.000621371
         city_distance_mi = city_distance_m * m_to_mi
         highway_distance_mi = highway_distance_m * m_to_mi
         return city_distance_mi, highway_distance_mi
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error calculating distances: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error calculating distances (HTTPError): {http_err}")
+            return 0.0, 0.0
+    except RequestException as e:
+        print(f"Error calculating distances (RequestException): {e}")
         return 0.0, 0.0
     except (KeyError, ValueError, TypeError) as e:
         print(f"Error processing distance data: {e}")
@@ -118,19 +124,18 @@ def get_route_traffic_data(start_coords: Tuple[float, float], end_coords: Tuple[
         return [], 0.0
 
     traffic_delay = 0
-    coordinates_list = [] 
+    coordinates_list = []
 
     params = {
         "access_token": MAPBOX_ACCESS_TOKEN,
         "geometries": "geojson",
         "steps": "true",
-        "overview": "full" 
+        "overview": "full"
     }
 
     start_lat, start_lon = start_coords
     end_lat, end_lon = end_coords
     url = f"{MAPBOX_DIRECTIONS_API_URL}{start_lon},{start_lat};{end_lon},{end_lat}"
-
 
     try:
         response = requests.get(url, params=params)
@@ -143,13 +148,13 @@ def get_route_traffic_data(start_coords: Tuple[float, float], end_coords: Tuple[
 
         all_coords = data["routes"][0]["geometry"]["coordinates"]
         if not all_coords:
-             return [], 0.0 
+             return [], 0.0
         num_coords = len(all_coords)
         target_points = 15
-        step = max(1, num_coords // target_points) 
+        step = max(1, num_coords // target_points)
 
         sampled_indices = list(range(0, num_coords, step))
-        if num_coords - 1 not in sampled_indices: 
+        if num_coords - 1 not in sampled_indices:
             sampled_indices.append(num_coords - 1)
 
         coordinates_list = [(coord[1], coord[0]) for i, coord in enumerate(all_coords) if i in sampled_indices]
@@ -160,13 +165,17 @@ def get_route_traffic_data(start_coords: Tuple[float, float], end_coords: Tuple[
         if duration_typical is not None and actual_duration is not None:
             traffic_delay = max(0, actual_duration - duration_typical) / 60
         else:
-            traffic_delay = 0 
-
+            traffic_delay = 0
 
         return coordinates_list, traffic_delay
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error retrieving route traffic data: {e}")
+    except HTTPError as http_err:
+        if http_err.response is not None and http_err.response.status_code == 429:
+            raise
+        else:
+            print(f"Error retrieving route traffic data (HTTPError): {http_err}")
+            return [], 0.0
+    except RequestException as e:
+        print(f"Error retrieving route traffic data (RequestException): {e}")
         return [], 0.0
     except (KeyError, ValueError, IndexError, TypeError) as e:
         print(f"Error processing route traffic data: {e}")
@@ -175,7 +184,7 @@ def get_route_traffic_data(start_coords: Tuple[float, float], end_coords: Tuple[
 def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], target_date: str) -> Tuple[float, str, str]:
     if not api_key or not coordinates_list or not target_date:
         print("Error: Missing API key, coordinates, or target date for weather data.")
-        return 0.0, "Low", "Low" 
+        return 0.0, "Low", "Low"
     temperature_sum = 0
     snow_sum = 0
     rain_sum = 0
@@ -196,7 +205,7 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
         params = {
             "key": api_key,
             "q": f"{lat},{lon}",
-            "days": 4, 
+            "days": 4,
             "aqi": "no",
             "alerts": "no"
         }
@@ -219,7 +228,7 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
                  try:
                      date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
                  except ValueError:
-                     continue 
+                     continue
 
                  if date_obj == target_date_obj:
                      day_data = day.get('day', {})
@@ -231,21 +240,25 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
                      visibility = day_data.get('avgvis_km', 0.0)
 
                      if isinstance(temperature, (int, float)): temperature_sum += temperature
-                     if isinstance(snow_cm, (int, float)): snow_sum += snow_cm # Summing cm
+                     if isinstance(snow_cm, (int, float)): snow_sum += snow_cm
                      if isinstance(rain_mm, (int, float)): rain_sum += rain_mm
                      if isinstance(visibility, (int, float)): visibility_sum += visibility
 
                      valid_coordinates += 1
                      found_date = True
-                     break 
-
-        except requests.exceptions.RequestException as e:
-            print(f"Error retrieving weather data for {lat}, {lon}: {e}")
-            continue 
+                     break
+        except HTTPError as http_err:
+            if http_err.response is not None and http_err.response.status_code == 429:
+                raise
+            else:
+                print(f"Error retrieving weather data for {lat}, {lon} (HTTPError): {http_err}")
+                continue
+        except RequestException as e:
+            print(f"Error retrieving weather data for {lat}, {lon} (RequestException): {e}")
+            continue
         except (KeyError, ValueError, TypeError) as e:
             print(f"Error processing weather data for {lat}, {lon}: {e}")
             continue
-
 
     if valid_coordinates > 0:
         average_temperature = temperature_sum / valid_coordinates
@@ -256,7 +269,6 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
         print("Warning: No valid weather data collected for any coordinate.")
         return 0.0, "Low", "Low"
 
-
     snow_classification = categorize_snow_level(average_snow_cm, average_visibility)
     rain_classification = categorize_rain_level(average_rain_mm)
 
@@ -264,24 +276,24 @@ def get_weather_data(api_key: str, coordinates_list: List[Tuple[float, float]], 
 
 
 def categorize_snow_level(snow_cm: float, visibility: float) -> str:
-    if snow_cm <= 0.1: 
+    if snow_cm <= 0.1:
         return "Low"
-    elif snow_cm <= 2.5: 
-        if visibility >= 1.0: return "Low" 
-        else: return "Medium" 
-    elif 2.5 < snow_cm <= 10: 
+    elif snow_cm <= 2.5:
+        if visibility >= 1.0: return "Low"
+        else: return "Medium"
+    elif 2.5 < snow_cm <= 10:
         if visibility >= 1.0: return "Medium"
-        elif 0.5 <= visibility < 1.0: return "Medium" 
-        else: return "Heavy" 
-    else: 
+        elif 0.5 <= visibility < 1.0: return "Medium"
+        else: return "Heavy"
+    else:
         return "Heavy"
 
 def categorize_rain_level(rain_mm: float) -> str:
-    if rain_mm <= 0.1: 
+    if rain_mm <= 0.1:
         return "Low"
-    elif rain_mm <= 5.0: 
+    elif rain_mm <= 5.0:
         return "Low"
-    elif 5.0 < rain_mm <= 15.0: 
+    elif 5.0 < rain_mm <= 15.0:
         return "Medium"
-    else: 
+    else:
         return "Heavy"
