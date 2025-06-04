@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-// Loading component with spinner and message
 const Loading = ({ message = "Processing your request..." }) => {
   const [dots, setDots] = useState('');
   
-  // Animate dots for a more dynamic loading message
   useEffect(() => {
     const interval = setInterval(() => {
       setDots(prevDots => {

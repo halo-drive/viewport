@@ -6,14 +6,13 @@ import logoViolet from '../assets/logo-violet.png';
 export default function AdminDashboard() {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [approvedUsers, setApprovedUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'approved'
+  const [activeTab, setActiveTab] = useState('pending'); 
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   
   const { logout } = useContext(AuthContext);
 
-  // Fetch all users when component mounts
   useEffect(() => {
     fetchAllUsers();
   }, []);
@@ -51,7 +50,6 @@ export default function AdminDashboard() {
         setMessage(`User ${email} approved successfully`);
         setMessageType('success');
         
-        // Move the user from pending to approved
         const userToMove = pendingUsers.find(user => user.email === email);
         if (userToMove) {
           userToMove.isApproved = true;
@@ -84,7 +82,6 @@ export default function AdminDashboard() {
         setMessage(`User ${email} deleted successfully`);
         setMessageType('success');
         
-        // Remove user from the appropriate list
         if (isApproved) {
           setApprovedUsers(approvedUsers.filter(user => user.email !== email));
         } else {

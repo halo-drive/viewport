@@ -1,10 +1,7 @@
-// viewport/frontend/src/services/api.js
-
-// Use Vite's environment variable for the base URL.
-// Fallback to empty string if not defined (though it should be via .env)
+//comment this out for prod and github
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-//for dev (you might adjust this for local testing if needed)
-// const API_BASE_URL = 'http://localhost:443'; // Keep commented for prod build
+//for dev only
+//const API_BASE_URL = 'http://localhost:443'; 
 
 async function apiRequest(url, method = 'GET', data = null) {
   const options = {
@@ -22,15 +19,14 @@ async function apiRequest(url, method = 'GET', data = null) {
   }
 
   try {
-    console.log("DEBUG: API_BASE_URL =", API_BASE_URL); // Check the base URL value
+    console.log("DEBUG: API_BASE_URL =", API_BASE_URL); 
     console.log("DEBUG: url parameter =", url);   
 
-    // Construct the full URL using the environment variable
-    const fullUrl = `${API_BASE_URL}${url}`; // <<< USE THIS CORRECT LINE
+    const fullUrl = `${API_BASE_URL}${url}`; 
 
     console.log(`DEBUG: Constructed fullUrl = ${fullUrl}`);
 
-    console.log(`Making API request to: ${method} ${fullUrl}`); // Optional: for debugging builds
+    console.log(`Making API request to: ${method} ${fullUrl}`); 
 
     const response = await fetch(fullUrl, options);
 
@@ -47,13 +43,10 @@ async function apiRequest(url, method = 'GET', data = null) {
     return responseData;
   } catch (error) {
     console.error('API request error:', error);
-    // Consider logging the URL that failed:
-    // console.error(`Failed URL: <span class="math-inline">\{API\_BASE\_URL\}</span>{url}`);
     throw error;
   }
 }
 
-// API endpoints remain the same
 export const api = {
   checkStatus: () => apiRequest('/api/status'),
 

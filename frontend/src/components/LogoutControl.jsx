@@ -2,45 +2,41 @@ import React, { useContext, useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { AuthContext } from '../AuthContext';
-import { AppContext } from '../AppContext'; // Import AppContext
+import { AppContext } from '../AppContext'; 
 import logoutIcon from '../assets/logout.png';
-import './LogoutControl.css'; // Ensure CSS is imported
+import './LogoutControl.css'; 
 
 const LogoutControl = () => {
   const map = useMap();
   const { logout } = useContext(AuthContext);
-  const { resetJourneyData } = useContext(AppContext); // Get resetJourneyData
+  const { resetJourneyData } = useContext(AppContext); 
 
   useEffect(() => {
-    // Prevent adding multiple controls if component re-renders
     if (map.buttons && map.buttons.logout) {
         return;
     }
 
     const LogoutButton = L.Control.extend({
       options: {
-        position: 'topright' // Position in the top right corner
+        position: 'topright' 
       },
 
       onAdd: function(map) {
-        // Create the container and button elements
         const container = L.DomUtil.create('div', 'leaflet-control leaflet-control-custom logout-button-container');
         const button = L.DomUtil.create('a', 'logout-button', container);
         const img = L.DomUtil.create('img', '', button);
         img.src = logoutIcon;
         img.alt = 'Logout';
-        // NOTE: Inline styles for width/height removed to allow CSS control
         button.href = '#';
         button.role = 'button';
         button.ariaLabel = 'Logout';
 
-        // Prevent map interactions when clicking the button
         L.DomEvent.disableClickPropagation(container);
         L.DomEvent.on(button, 'click', L.DomEvent.stop);
         L.DomEvent.on(button, 'click', () => {
-          console.log("Logout button clicked: Resetting journey and logging out..."); // Optional: for debugging
-          resetJourneyData(); // Call reset first
-          logout();         // Then call logout
+          console.log("Logout button clicked: Resetting journey and logging out..."); 
+          resetJourneyData(); 
+          logout();         
         });
 
         this._button = button;
@@ -48,7 +44,6 @@ const LogoutControl = () => {
       },
 
       onRemove: function(map) {
-        // Clean up event listeners
         if (this._button) {
           L.DomEvent.off(this._button);
         }
@@ -56,16 +51,13 @@ const LogoutControl = () => {
       }
     });
 
-    // Add the control to the map
     const logoutControl = new LogoutButton();
     logoutControl.addTo(map);
 
-    // Store reference to prevent duplicates
     if (!map.buttons) map.buttons = {};
     map.buttons.logout = logoutControl;
 
 
-    // Cleanup function to remove the control when the component unmounts
     return () => {
        if (map && map.buttons && map.buttons.logout) {
             try {
@@ -76,9 +68,8 @@ const LogoutControl = () => {
             }
        }
     };
-  }, [map, logout, resetJourneyData]); // Add resetJourneyData to dependencies
-
-  // This component only adds the control to the map, it doesn't render anything itself
+  }, [map, logout, resetJourneyData]); 
+  
   return null;
 };
 

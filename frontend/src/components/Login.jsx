@@ -15,37 +15,27 @@ export default function Login() {
   const { login, signup, loading, error } = useContext(AuthContext);
   
   useEffect(() => {
-    // We need to dynamically import Leaflet because it requires window
     const initMap = async () => {
-      // Only import leaflet on client-side
       const L = await import('leaflet');
 
-      // Initialize map if it doesn't exist yet
       if (!mapRef.current) {
-        // Define coordinates
         const londonCoordinates = [51.461883, -0.087581];
-        const glasgowCoordinates = [55.8642, -4.2518]; // Glasgow coordinates
+        const glasgowCoordinates = [55.8642, -4.2518]; 
 
-        // --- Calculate direction vector ---
         const startLat = londonCoordinates[0];
         const startLon = londonCoordinates[1];
         const endLat = glasgowCoordinates[0];
         const endLon = glasgowCoordinates[1];
 
-        const deltaLat = endLat - startLat; // Total change in latitude
-        const deltaLon = endLon - startLon; // Total change in longitude
+        const deltaLat = endLat - startLat; 
+        const deltaLon = endLon - startLon; 
 
-        // --- Define step size ---
-        // Keep vertical movement similar to before for consistent speed feel
         const latStep = 0.02;
-        // Calculate proportional longitude step (avoid division by zero if deltaLat is 0)
         const lonStep = (deltaLat !== 0) ? deltaLon * (latStep / deltaLat) : 0;
-        // -----------------------------
 
-        // Create map centered on London
         const map = L.map('map-background', {
           center: londonCoordinates,
-          zoom: 10, // Lower zoom to show more of the UK
+          zoom: 10, 
           zoomControl: false,
           attributionControl: false,
           dragging: false,
@@ -55,71 +45,49 @@ export default function Login() {
           touchZoom: false
         });
 
-        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Store map reference
         mapRef.current = map;
 
-        // Create a continuous panning effect towards Glasgow
         const panStep = () => {
           const currentCenter = map.getCenter();
 
-          // Calculate next position
           const newLat = currentCenter.lat + latStep;
           const newLon = currentCenter.lng + lonStep;
 
-          // Check if we've reached or passed Glasgow's latitude
-          // (Since we're moving north, we check if newLat is still less than endLat)
           if (newLat < endLat) {
-            // Pan to new location along the angled line
             map.panTo([newLat, newLon], {
               animate: true,
-              duration: 2.0, // Smooth animation over 2 seconds
-              easeLinearity: 1 // Linear movement
+              duration: 2.0, 
+              easeLinearity: 1 
             });
 
-            // Schedule next pan after this one completes
-            setTimeout(panStep, 2100); // Slightly longer than animation duration
+            setTimeout(panStep, 2100); 
           } else {
-            // We've reached Glasgow (or slightly passed), reset to London
-            // Optional: Snap exactly to Glasgow first for a brief moment?
-            // map.panTo(glasgowCoordinates, { animate: false });
-
-            // Use a quick fade out/in effect to hide the transition
             document.getElementById('map-background').style.opacity = 0;
-
             setTimeout(() => {
-              map.panTo(londonCoordinates, { animate: false }); // Reset to London
+              map.panTo(londonCoordinates, { animate: false }); 
               document.getElementById('map-background').style.opacity = 1;
-
-              // Restart the movement
-              setTimeout(panStep, 500); // Wait half a second before starting again
-            }, 1000); // Fade transition time
+              setTimeout(panStep, 500); 
+            }, 1000); 
           }
         };
-
-        // Start the panning effect
         panStep();
       }
     };
 
     initMap();
 
-    // Clean up on unmount
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
-      // Clear any pending timeouts if component unmounts mid-animation
-      // Note: This requires storing timeout IDs, adding complexity.
-      // For a purely decorative background, maybe not strictly necessary.
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, []); 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -133,7 +101,7 @@ export default function Login() {
       const result = await signup(username, email, password);
       if (result.success) {
         alert(result.message);
-        setIsSignup(false); // Switch back to login
+        setIsSignup(false); 
         setUsername('');
         setEmail('');
         setPassword('');

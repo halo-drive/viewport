@@ -1,10 +1,7 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 import folium
 import requests
 from geopy.distance import geodesic
-from typing import Tuple, List, Optional # Added Optional
+from typing import Tuple, List, Optional 
 from collections import namedtuple
 from config import Config
 
@@ -17,14 +14,11 @@ DECODING_TABLE = [
     36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
 ]
 
-# Use HERE API Key from config for consistency
 api_key = Config.HERE_API_KEY
 
 PolylineHeader = namedtuple('PolylineHeader', 'precision,third_dim,third_dim_precision')
 
-# --- Polyline Decoding Functions (Unchanged) ---
 def decode_header(decoder):
-    # (code unchanged)
     version = next(decoder)
     if version != FORMAT_VERSION:
         raise ValueError('Invalid format version')
@@ -36,7 +30,6 @@ def decode_header(decoder):
     return PolylineHeader(precision, third_dim, third_dim_precision)
 
 def decode_char(char):
-    # (code unchanged)
     char_value = ord(char)
     try:
         value = DECODING_TABLE[char_value - 45]
@@ -47,14 +40,12 @@ def decode_char(char):
     return value
 
 def to_signed(value):
-    # (code unchanged)
     if value & 1:
         value = ~value
     value >>= 1
     return value
 
 def decode_unsigned_values(encoded):
-    # (code unchanged)
     result = shift = 0
     for char in encoded:
         value = decode_char(char)
@@ -68,7 +59,6 @@ def decode_unsigned_values(encoded):
         raise ValueError('Invalid encoding')
 
 def iter_decode(encoded):
-    # (code unchanged)
     last_lat = last_lng = last_z = 0
     decoder = decode_unsigned_values(encoded)
     header = decode_header(decoder)
@@ -89,14 +79,11 @@ def iter_decode(encoded):
                 yield (last_lat / factor_degree, last_lng / factor_degree)
         except StopIteration:
             raise ValueError("Invalid encoding. Premature ending reached")
-# --- End Polyline Decoding ---
 
 def get_here_directions(origin: str, destination: str, api_key: str) -> Optional[List[Tuple[float, float]]]:
-    """ Gets route polyline between two points ('lat,lon' strings). """
-    # Added type hints and return Optional
     url = f"https://router.hereapi.com/v8/routes?transportMode=car&origin={origin}&destination={destination}&return=polyline&apikey={api_key}"
     try:
-        response = requests.get(url, timeout=15) # Added timeout
+        response = requests.get(url, timeout=15) 
         response.raise_for_status()
         data = response.json()
         routes = data.get('routes', [])
@@ -106,16 +93,14 @@ def get_here_directions(origin: str, destination: str, api_key: str) -> Optional
                 polyline_str = sections[0].get('polyline')
                 if polyline_str:
                      decoded_route = list(iter_decode(polyline_str))
-                     return decoded_route if decoded_route else None # Return None if decode fails
+                     return decoded_route if decoded_route else None 
     except requests.exceptions.RequestException as e:
          print(f"Error fetching HERE directions ({origin} -> {destination}): {e}")
     except (ValueError, KeyError, IndexError) as e:
          print(f"Error processing HERE directions data ({origin} -> {destination}): {e}")
-    return None # Return None on any error or if no route found
+    return None 
 
 def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, float]]:
-    """ Gets coordinates ('lat,lon') for a place name using HERE Geocoder. """
-    # Added return Optional
     url = f"https://geocode.search.hereapi.com/v1/geocode?q={place_name}&apiKey={api_key}"
     try:
         response = requests.get(url, timeout=10)
@@ -123,7 +108,6 @@ def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, floa
         data = response.json()
         if 'items' in data and data['items']:
             location = data['items'][0]['position']
-            # Ensure lat and lon are present and floats
             lat = float(location.get('lat'))
             lng = float(location.get('lng'))
             return lat, lng
@@ -131,24 +115,21 @@ def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, floa
          print(f"Error geocoding '{place_name}' with HERE: {e}")
     except (ValueError, KeyError, IndexError, TypeError) as e:
          print(f"Error processing HERE geocoding data for '{place_name}': {e}")
-    return None # Return None on error or no result
+    return None 
 
 def get_fuel_station_coordinates(coords: Tuple[float, float], api_key: str) -> Optional[Tuple[float, float]]:
-    """ Finds coordinates of the nearest fuel station to given coords ('lat,lon') using HERE Discover. """
-    # Added return Optional
     base_url = 'https://discover.search.hereapi.com/v1/discover'
     params = {
         'q': 'fuel station',
         'apiKey': api_key,
         'at': f'{coords[0]},{coords[1]}',
-        'limit': 5 # Get a few options
+        'limit': 5
     }
     try:
         response = requests.get(base_url, params=params, timeout=10)
         response.raise_for_status()
         fuel_stations = response.json()
         if 'items' in fuel_stations and fuel_stations['items']:
-            # Find closest station based on distance if available, else take the first
             closest_station = min(fuel_stations['items'], key=lambda x: x.get('distance', float('inf')))
             position = closest_station.get('position')
             if position:
@@ -159,55 +140,40 @@ def get_fuel_station_coordinates(coords: Tuple[float, float], api_key: str) -> O
          print(f"Error finding HERE fuel stations near {coords}: {e}")
     except (ValueError, KeyError, IndexError, TypeError) as e:
          print(f"Error processing HERE fuel station data near {coords}: {e}")
-    return None # Return None on error or no result
+    return None 
 
 
-# --- MODIFIED FUNCTION ---
 def get_route_with_fuel_stations(
     api_key: str,
-    origin_coords: Tuple[float, float], # Changed from origin_city
-    destination_coords: Tuple[float, float] # Changed from destination_city
+    origin_coords: Tuple[float, float],
+    destination_coords: Tuple[float, float] 
 ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[Tuple[float, float]]]:
-    """
-    Calculates a route polyline and finds fuel stations along it using HERE APIs.
-    Accepts origin and destination coordinates directly.
-
-    Returns:
-        Tuple containing:
-        - Original route coordinates (list of (lat, lon) tuples) - MAY BE LESS USEFUL NOW
-        - Final route points potentially including stations (list of (lat, lon) tuples for polyline)
-        - Coordinates of found fuel stations (list of (lat, lon) tuples)
-    """
     print(f"Calculating route/stations from {origin_coords} to {destination_coords}")
 
-    # Convert coords tuples to 'lat,lon' strings for HERE API calls
     origin_coords_str = f"{origin_coords[0]},{origin_coords[1]}"
     destination_coords_str = f"{destination_coords[0]},{destination_coords[1]}"
 
-    # 1. Get the initial direct route polyline
     route_points = get_here_directions(origin_coords_str, destination_coords_str, api_key)
 
     if not route_points:
         raise ValueError("Unable to retrieve initial route points from HERE API")
 
-    # --- Station Finding Logic (largely unchanged, but uses route_points) ---
     try:
         total_distance = sum(geodesic(route_points[i], route_points[i+1]).km for i in range(len(route_points) - 1))
-    except ValueError: # Handle potential issues with geodesic calculation if points are identical
+    except ValueError: 
         print("Warning: Could not calculate total distance, defaulting to 0.")
         total_distance = 0
 
-    interval_distance = total_distance / 4 if total_distance > 0 else 50 # km, fallback interval
+    interval_distance = total_distance / 4 if total_distance > 0 else 50 
     fuel_station_coords = []
-    original_route_coords_list = list(route_points) # Keep a copy
+    original_route_coords_list = list(route_points) 
 
-    # Get fuel station near origin (e.g., after 5km)
     cumulative_distance = 0
     for i in range(1, len(route_points)):
         try:
             segment_distance = geodesic(route_points[i-1], route_points[i]).km
             cumulative_distance += segment_distance
-        except ValueError: continue # Skip if points are identical
+        except ValueError: continue 
 
         if cumulative_distance >= 5:
             fuel_coords = get_fuel_station_coordinates(route_points[i], api_key)
@@ -216,7 +182,6 @@ def get_route_with_fuel_stations(
                 print(f"Found initial fuel station near {route_points[i]}")
                 break
 
-    # Add stations roughly every quarter distance
     cumulative_distance = 0
     last_fuel_station_index = 0
     for i in range(1, len(route_points)):
@@ -230,28 +195,7 @@ def get_route_with_fuel_stations(
             if fuel_coords and fuel_coords not in fuel_station_coords:
                 fuel_station_coords.append(fuel_coords)
                 print(f"Found mid-route fuel station near {route_points[i]}")
-                cumulative_distance = 0 # Reset distance counter
-                last_fuel_station_index = i # Track index if needed
-
-    # Get fuel station towards destination (if needed based on remaining distance)
-    # Simplified: just add stations based on interval for now
-    # You could add more complex logic based on remaining distance vs interval
-
-    # --- End Station Finding ---
-
-    # Limit number of stations if needed (e.g., max 2-3)
-    # fuel_station_coords = fuel_station_coords[:3] # Example limit
-
-    # Return original route list, polyline points (which might be the same if no stations added), and station coords
-    # The API currently rebuilds the polyline if stations are found.
-    # Let's return the original route points, the direct polyline points, and station coords.
-    # The API layer (`diesel_api.py`) will decide how to combine them if needed.
+                cumulative_distance = 0
+                last_fuel_station_index = i 
 
     return original_route_coords_list, route_points, fuel_station_coords
-
-
-# --- display_route_on_map, launch_all, getdata functions are likely unused by API ---
-# --- They can be kept for standalone testing or removed if desired ---
-# def display_route_on_map(...): ...
-# def launch_all(...): ...
-# def getdata(...): ...

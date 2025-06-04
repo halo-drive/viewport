@@ -1,16 +1,13 @@
-# electric_routing_here.py
 import folium
 import requests
 import os
 from geopy.distance import geodesic
-from typing import Tuple, List, Optional # Added Optional
+from typing import Tuple, List, Optional 
 from collections import namedtuple
 from config import Config
 
-# HERE Maps API key from config
 api_key = Config.HERE_API_KEY
 
-# --- Polyline decoding functions (Unchanged) ---
 FORMAT_VERSION = 1
 DECODING_TABLE = [
     62, -1, -1, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1, -1,
@@ -20,7 +17,6 @@ DECODING_TABLE = [
 ]
 PolylineHeader = namedtuple('PolylineHeader', 'precision,third_dim,third_dim_precision')
 def decode_header(decoder):
-    # (code unchanged)
     version = next(decoder)
     if version != FORMAT_VERSION: raise ValueError('Invalid format version')
     value = next(decoder)
@@ -30,19 +26,16 @@ def decode_header(decoder):
     third_dim_precision = (value >> 3) & 15
     return PolylineHeader(precision, third_dim, third_dim_precision)
 def decode_char(char):
-    # (code unchanged)
     char_value = ord(char)
     try: value = DECODING_TABLE[char_value - 45]
     except IndexError: raise ValueError('Invalid encoding')
     if value < 0: raise ValueError('Invalid encoding')
     return value
 def to_signed(value):
-    # (code unchanged)
     if value & 1: value = ~value
     value >>= 1
     return value
 def decode_unsigned_values(encoded):
-    # (code unchanged)
     result = shift = 0
     for char in encoded:
         value = decode_char(char)
@@ -53,7 +46,6 @@ def decode_unsigned_values(encoded):
         else: shift += 5
     if shift > 0: raise ValueError('Invalid encoding')
 def iter_decode(encoded):
-    # (code unchanged)
     last_lat = last_lng = last_z = 0
     decoder = decode_unsigned_values(encoded)
     header = decode_header(decoder)
@@ -71,14 +63,9 @@ def iter_decode(encoded):
             else:
                 yield (last_lat / factor_degree, last_lng / factor_degree)
         except StopIteration: raise ValueError("Invalid encoding. Premature ending reached")
-# --- End Polyline Decoding ---
 
 
-# --- Helper Functions (get_here_directions, get_coordinates, get_charging_station_coordinates) ---
-# --- Keep these helpers, ensure they use the global `api_key` and have error handling ---
 def get_here_directions(origin: str, destination: str, api_key: str) -> Optional[List[Tuple[float, float]]]:
-    """ Gets route polyline between two points ('lat,lon' strings). """
-    # (code unchanged from previous diesel_routing_here.py update)
     url = f"https://router.hereapi.com/v8/routes?transportMode=car&origin={origin}&destination={destination}&return=polyline&apikey={api_key}"
     try:
         response = requests.get(url, timeout=15)
@@ -99,8 +86,6 @@ def get_here_directions(origin: str, destination: str, api_key: str) -> Optional
     return None
 
 def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, float]]:
-    """ Gets coordinates ('lat,lon') for a place name using HERE Geocoder. """
-    # (code unchanged from previous diesel_routing_here.py update)
     url = f"https://geocode.search.hereapi.com/v1/geocode?q={place_name}&apiKey={api_key}"
     try:
         response = requests.get(url, timeout=10)
@@ -118,8 +103,6 @@ def get_coordinates(place_name: str, api_key: str) -> Optional[Tuple[float, floa
     return None
 
 def get_charging_station_coordinates(coords: Tuple[float, float], api_key: str) -> Optional[Tuple[float, float]]:
-    """ Finds coordinates of the nearest EV charging station to given coords ('lat,lon') using HERE Discover. """
-    # (code largely unchanged, added types/error checks)
     base_url = 'https://discover.search.hereapi.com/v1/discover'
     params = {
         'q': 'ev charging station',
@@ -143,50 +126,33 @@ def get_charging_station_coordinates(coords: Tuple[float, float], api_key: str) 
     except (ValueError, KeyError, IndexError, TypeError) as e:
         print(f"Error processing HERE EV station data near {coords}: {e}")
     return None
-# --- End Helper Functions ---
 
 
-# --- MODIFIED FUNCTION ---
 def get_route_with_charging_stations(
     api_key: str,
-    origin_coords: Tuple[float, float], # Changed from origin_city
-    destination_coords: Tuple[float, float] # Changed from destination_city
+    origin_coords: Tuple[float, float], 
+    destination_coords: Tuple[float, float] 
 ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]], List[Tuple[float, float]]]:
-    """
-    Calculates a route polyline and finds EV charging stations along it using HERE APIs.
-    Accepts origin and destination coordinates directly.
-
-    Returns:
-        Tuple containing:
-        - Original route coordinates (list of (lat, lon) tuples) - MAY BE LESS USEFUL NOW
-        - Final route points potentially including stations (list of (lat, lon) tuples for polyline)
-        - Coordinates of found charging stations (list of (lat, lon) tuples)
-    """
     print(f"Calculating EV route/stations from {origin_coords} to {destination_coords}")
 
-    # Convert coords tuples to 'lat,lon' strings for HERE API calls
     origin_coords_str = f"{origin_coords[0]},{origin_coords[1]}"
     destination_coords_str = f"{destination_coords[0]},{destination_coords[1]}"
 
-    # 1. Get the initial direct route polyline
     route_points = get_here_directions(origin_coords_str, destination_coords_str, api_key)
 
     if not route_points:
         raise ValueError("Unable to retrieve initial EV route points from HERE API")
 
-    # --- Station Finding Logic (largely unchanged, uses route_points) ---
     try:
         total_distance = sum(geodesic(route_points[i], route_points[i+1]).km for i in range(len(route_points) - 1))
     except ValueError:
         print("Warning: Could not calculate EV total distance, defaulting to 0.")
         total_distance = 0
 
-    # Adjust interval for EV range considerations
-    interval_distance = 120 # km, maybe adjust based on typical EV truck range?
+    interval_distance = 120 
     charging_station_coords = []
-    original_route_coords_list = list(route_points) # Keep a copy
+    original_route_coords_list = list(route_points) 
 
-    # Get charging station near origin (e.g., after 5km)
     cumulative_distance = 0
     for i in range(1, len(route_points)):
         try:
@@ -201,7 +167,6 @@ def get_route_with_charging_stations(
                 print(f"Found initial EV charging station near {route_points[i]}")
                 break
 
-    # Add charging stations roughly every interval_distance
     cumulative_distance = 0
     for i in range(1, len(route_points)):
         try:
@@ -214,33 +179,21 @@ def get_route_with_charging_stations(
             if charging_coords and charging_coords not in charging_station_coords:
                 charging_station_coords.append(charging_coords)
                 print(f"Found mid-route EV charging station near {route_points[i]}")
-                cumulative_distance = 0 # Reset distance counter
+                cumulative_distance = 0 
 
-    # Get charging station towards destination (simplified)
-    # Could add logic based on remaining distance vs range/interval
 
-    # Limit stations? (Example: Max 4 including start/mid/end areas)
     if len(charging_station_coords) > 4:
          print(f"Limiting charging stations from {len(charging_station_coords)} to 4")
-         # Simple strategy: keep first, last, and spread middle ones
          if len(charging_station_coords) > 2:
              mid_indices = list(range(1, len(charging_station_coords) - 1))
-             step = max(1, len(mid_indices) // 2) # Aim for 2 middle stations
+             step = max(1, len(mid_indices) // 2) 
              kept_middle = [charging_station_coords[mid_indices[i]] for i in range(0, len(mid_indices), step)][:2]
              charging_station_coords = [charging_station_coords[0]] + kept_middle + [charging_station_coords[-1]]
-         else: # Keep first and last if only 2
+         else: 
              charging_station_coords = [charging_station_coords[0], charging_station_coords[-1]]
 
     print(f"Final EV route using {len(charging_station_coords)} charging stations.")
-    # --- End Station Finding ---
 
 
-    # Return original route list, direct polyline points, and station coords.
-    # API layer will combine if needed.
     return original_route_coords_list, route_points, charging_station_coords
 
-# --- display_route_on_map, launch_all, getdata functions likely unused by API ---
-# --- Can be kept or removed ---
-# def display_route_on_map(...): ...
-# def launch_all(...): ...
-# def getdata(...): ...

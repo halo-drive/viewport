@@ -6,7 +6,7 @@
 }
 
 .fuel-gauge svg {
-  display: block; /* Prevents extra space below */
+  display: block; 
   margin: 0;
   padding: 0;
 }

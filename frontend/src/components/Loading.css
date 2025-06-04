@@ -8,7 +8,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 499; /* Just below floating cards (500) and well below the left bar and logo (1000) */
+    z-index: 499; 
     backdrop-filter: blur(3px);
   }
   
@@ -40,8 +40,8 @@
     height: 50px;
     border: 5px solid rgba(111, 66, 193, 0.2);
     border-radius: 50%;
-    border-top-color: #6f42c1; /* Match the route color */
-    border-bottom-color: #5e35b1; /* Match the secondary route color */
+    border-top-color: #6f42c1; 
+    border-bottom-color: #5e35b1; 
     animation: spin 1s ease-in-out infinite;
   }
   

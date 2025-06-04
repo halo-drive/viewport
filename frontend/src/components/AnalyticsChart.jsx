@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AppContext } from '../AppContext';
 
-// Label mapping specifically for feature importance chart
 const featureImportanceLabelMap = {
   'Distance_highway': 'Distance Highway',
   'Distance_city': 'Distance City',
@@ -22,7 +21,6 @@ export default function AnalyticsChart() {
   const [featureData, setFeatureData] = useState([]);
   const [animate, setAnimate] = useState(false);
 
-  // Function to get display label
   const getDisplayLabel = (backendLabel) => {
     return featureImportanceLabelMap[backendLabel] || backendLabel;
   };

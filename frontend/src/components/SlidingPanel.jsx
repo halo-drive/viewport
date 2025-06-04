@@ -1,8 +1,6 @@
 import { useContext } from 'react';
 import { AppContext } from '../AppContext';
 import AnalyticsChart from './AnalyticsChart';
-
-// Import icons
 import goods from "../assets/goods.png";
 import insurance from "../assets/insurance.png";
 import fuel from "../assets/fuel.png";
@@ -22,7 +20,6 @@ export default function SlidingPanel() {
 
   if (!activePane) return null;
   
-  // Don't render energy pane from here, it's now handled separately
   if (activePane === "energy") return null;
   
   return (

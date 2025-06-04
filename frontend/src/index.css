@@ -87,7 +87,6 @@
   color: rgba(0, 0, 0, 0.664);
 }
 
-/* Analytics Chart Styles */
 .analytics-chart {
   margin-top: 15px;
 }
@@ -117,7 +116,7 @@
 .bar-fill {
   height: 100%;
   background-color: #4e7aff;
-  width: 0%; /* Start empty */
+  width: 0%; 
   transition: width 1s ease-out;
   border-radius: 3px;
 }
@@ -129,14 +128,13 @@
   padding-left: 10px;
 }
 
-/* Sliding Pane Styles */
 
 .sliding-pane {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  left: 90px; /* Position right next to the left bar */
-  height: 400px; /* Same height as the left bar */
+  left: 90px; 
+  height: 400px; 
   width: 300px;
   background-image: linear-gradient(to bottom, #e6646457, #9198e5ce);
   border-radius: 0 60px 60px 0;
@@ -187,7 +185,6 @@
   color: rgb(11, 37, 4);
 }
 
-/* Bar Chart Color Classes */
 .bar-color-1 { background-color: #4e7aff; } 
 .bar-color-2 { background-color: #ff6b6b; } 
 .bar-color-3 { background-color: #4ecdc4; } 
@@ -197,7 +194,6 @@
 .bar-color-7 { background-color: #f58231; } 
 .bar-color-8 { background-color: #e6194c; } 
 
-/* Cost Pane Styles */
 .cost-container {
   padding: 10px 0;
 }
@@ -210,7 +206,7 @@
 .cost-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;  /* This was added */
+  align-items: center; 
   padding: 12px 10px;
   margin-bottom: 10px;
   background-color: #f5f5f5a8;
@@ -221,13 +217,13 @@
 .cost-label {
   font-weight: 500;
   color: #444;
-  flex: 1;  /* This was added */
+  flex: 1; 
 }
 
 .cost-value {
   font-weight: 600;
   color: #2c3e50;
-  flex: 0 0 auto;  /* This was added */
+  flex: 0 0 auto;  
 }
 
 .cost-icon {
@@ -236,7 +232,6 @@
   margin: 0 10px;
 }
 
-/* Journey Pane Styles */
 .journey-container {
   padding: 10px 0;
 }
@@ -276,7 +271,6 @@
   flex: 0 0 auto;
 }
 
-/* Fleet Pane Styles */
 .fleet-container {
   padding: 10px 0;
 }
@@ -322,7 +316,6 @@
   height: 20px;
 }
 
-/* Start Form Styles */
 .start-form {
   display: flex;
   flex-direction: column;
@@ -401,11 +394,8 @@
   transform: scale(1.05);
 }
 
-/* .start-journey-button:hover {
-  transform: scale(1.05);
-} */
 
-/* Special dimensions for start pane */
+
 .start-pane {
   width: 380px;
   height: 650px;
@@ -417,11 +407,9 @@
 .form-group select:focus,
 .fuel-btn:focus {
   outline: none;
-  border-color: #ddd; /* Same as the default border color */
-  box-shadow: none;
+  border-color: #ddd; 
 }
 
-/* Custom scrollbar for journey form */
 .start-form::-webkit-scrollbar {
   width: 8px;
 }
@@ -440,7 +428,6 @@
   background-color: #43484e71;
 }
 
-/* Floating Cards Styles */
 .floating-cards-container {
   position: absolute;
   top: 20px;
@@ -450,7 +437,6 @@
   gap: 15px;
   z-index: 500;
   width: auto;
-  /* display: none; */
 }
 
 .floating-card {
@@ -505,7 +491,6 @@
   color: #000f29;
 }
 
-/* Logo on map */
 .map-logo {
   position: absolute;
   bottom: 20px;
@@ -517,10 +502,8 @@
   width: 80px;
   height: auto;
   opacity: 0.5;
-  /* filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)); */
 }
 
-/*to disable the buttons*/
 .disabled-button {
   opacity: 0.5;
   cursor: not-allowed !important;
@@ -530,7 +513,6 @@
   transform: none !important;
 }
 
-/* Route display styles */
 .custom-marker-icon {
   background-color: white;
   border: 3px solid #6f42c1;
@@ -546,22 +528,18 @@
   margin-left: -15px !important;
 }
 
-/* Hide the instruction lists from the routing control */
 .leaflet-routing-container {
   display: none !important;
 }
 
-/* Style for highlighting the active route */
 .leaflet-routing-alt {
   display: none !important;
 }
 
-/* Style for making route visible */
 .leaflet-routing-line {
   opacity: 0.9;
 }
 
-/* Styles for when journey is active in Start pane */
 .journey-active-container {
   display: flex;
   flex-direction: column;
@@ -625,26 +603,20 @@
 }
 
 
-/* Target the leaflet container for top-right controls */
 .leaflet-top.leaflet-right {
-  display: flex; /* Enable flexbox */
-  flex-direction: column; /* Stack items vertically */
-  /* Add gap if desired */
+  display: flex; 
+  flex-direction: column; 
   gap: 0px;
 }
 
-/* Assign order to the specific control containers */
 .leaflet-control.logout-button-container {
-  order: 1; /* Logout button appears first */
+  order: 1; 
 }
 
 .leaflet-control.gps-button-container {
-  order: 2; /* GPS button appears second */
+  order: 2; 
 }
 
 .leaflet-top.leaflet-right .leaflet-control {
-  margin-bottom: 0; /* Reset all margins */
-  /* Or specifically target bottom margin if preferred: */
-  /* margin-bottom: 0 !important; */
-  /* Use !important only if margin: 0 doesn't work, as Leaflet's default might be specific */
+  margin-bottom: 0;
 }

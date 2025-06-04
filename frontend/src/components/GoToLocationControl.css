@@ -1,16 +1,16 @@
 .gps-button {
     display: block;
-    padding: 5px;          /* Adjust padding as needed */
-    background-color: rgba(253, 251, 251, 0.281); /* Ensure it has a background */
-    border-radius: 4px;     /* Round the corners */
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4); /* Add shadow directly */
+    padding: 5px;          
+    background-color: rgba(253, 251, 251, 0.281); 
+    border-radius: 4px;     
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4); 
     cursor: pointer;
     line-height: 0;
   }
   
   .gps-button img {
      display: block;
-     width: 30px;          /* Control icon size */
+     width: 30px;          
      height: 30px;
      margin: auto;
   }

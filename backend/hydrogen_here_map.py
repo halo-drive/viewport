@@ -1,21 +1,13 @@
-# hydrogen_here_map.py - Modified to provide map data functions for hydrogen_api.py
-# OPTIMIZED VERSION: Geocodes each city only once in find_nearest_stations.
-
-# Keep necessary imports for the functions used by hydrogen_api.py
 from geopy.distance import geodesic
 import requests
-from geopy.geocoders import Nominatim # Kept as it's used by the kept get_coordinates
+from geopy.geocoders import Nominatim 
 from collections import namedtuple
-import time # Import time if needed for rate limiting Nominatim
-
-# Removed: folium, pandas, Blueprint, render_template (as they are unused)
+import time 
 
 from config import Config
 
-# Keep HERE API Key
 here_api_key = Config.HERE_API_KEY
 
-# Keep Polyline decoding functions and constants (needed by get_here_directions)
 FORMAT_VERSION = 1
 DECODING_TABLE = [62, -1, -1, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1, -1,
                   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
@@ -25,7 +17,6 @@ DECODING_TABLE = [62, -1, -1, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1
 PolylineHeader = namedtuple('PolylineHeader', 'precision,third_dim,third_dim_precision')
 
 def decode_header(decoder):
-    """Decodes the polyline header."""
     try:
         version = next(decoder)
         if version != FORMAT_VERSION:
@@ -41,7 +32,6 @@ def decode_header(decoder):
 
 
 def decode_char(char):
-    """Decodes a single character."""
     char_value = ord(char)
     try:
         value = DECODING_TABLE[char_value - 45]
@@ -52,14 +42,12 @@ def decode_char(char):
     return value
 
 def to_signed(value):
-    """Converts zigzag-encoded value to signed integer."""
     if value & 1:
         value = ~value
     value >>= 1
     return value
 
 def decode_unsigned_values(encoded):
-    """Decodes the polyline string into unsigned integer values."""
     result = shift = 0
     for char in encoded:
         value = decode_char(char)
@@ -69,26 +57,23 @@ def decode_unsigned_values(encoded):
             result = shift = 0
         else:
             shift += 5
-            # Add check for excessively long shifts, indicating potential corruption
-            if shift > 30: # 6 * 5 = 30 bits, covers 32-bit integers
+            if shift > 30: 
                  raise ValueError("Invalid encoding. Possible corruption detected.")
-    # Check if the last character indicated continuation
     if shift > 0:
         raise ValueError('Invalid encoding. Unfinished sequence.')
 
 def iter_decode(encoded):
-    """Decodes a polyline string into an iterator of coordinate tuples."""
-    if not encoded: # Handle empty string input
-         return iter([]) # Return an empty iterator
+    if not encoded: 
+         return iter([]) 
 
     last_lat = last_lng = last_z = 0
     decoder = decode_unsigned_values(encoded)
     try:
         header = decode_header(decoder)
-    except ValueError as e: # Catch header decoding errors
+    except ValueError as e: 
          print(f"Error decoding polyline header: {e}")
          return iter([])
-    except StopIteration: # Catch empty decoder after header attempt
+    except StopIteration: 
          print("Error decoding polyline: No data after header.")
          return iter([])
 
@@ -99,15 +84,14 @@ def iter_decode(encoded):
         try:
             last_lat += to_signed(next(decoder))
         except StopIteration:
-            return # Normal end of iteration
-        except ValueError as e: # Catch errors decoding latitude delta
+            return 
+        except ValueError as e: 
              print(f"Error decoding latitude delta: {e}")
              return iter([])
 
         try:
             last_lng += to_signed(next(decoder))
             if third_dim:
-                # Need to handle StopIteration here too for the z value
                 try:
                     last_z += to_signed(next(decoder))
                     yield (last_lat / factor_degree, last_lng / factor_degree, last_z / factor_z)
@@ -117,49 +101,38 @@ def iter_decode(encoded):
             else:
                 yield (last_lat / factor_degree, last_lng / factor_degree)
         except StopIteration:
-             # This indicates incomplete pairs in the encoded string
              print("Error decoding polyline: Premature ending after latitude delta.")
              raise ValueError("Invalid encoding. Premature ending reached after latitude delta.")
-        except ValueError as e: # Catch errors decoding longitude/z delta
+        except ValueError as e: 
              print(f"Error decoding longitude/z delta: {e}")
              return iter([])
 
 
-# --- Keep Functions Used by hydrogen_api.py ---
-
 def get_here_directions(origin, destination, api_key):
-    """Gets route polyline coordinates using HERE Routing API."""
-    # Validate inputs
     if not all([origin, destination, api_key]):
         print("Warning: Missing input for get_here_directions")
         return None
-    # Check if coordinates themselves are valid (not None)
     if origin is None or destination is None or origin[0] is None or origin[1] is None or destination[0] is None or destination[1] is None:
         print("Warning: None coordinate found in get_here_directions input")
         return None
 
-    # Assumes origin and destination are (lat, lon) tuples
     url = f"https://router.hereapi.com/v8/routes?transportMode=car&origin={origin[0]},{origin[1]}&destination={destination[0]},{destination[1]}&return=polyline&apikey={api_key}"
     try:
-        # Consider adding a timeout
-        response = requests.get(url, timeout=20) # Increased timeout slightly for routing
+        response = requests.get(url, timeout=20)
         response.raise_for_status()
         data = response.json()
 
-        # Safe access to nested data
         routes = data.get('routes', [])
         if routes:
             sections = routes[0].get('sections', [])
             if sections:
                 polyline_str = sections[0].get('polyline')
                 if polyline_str:
-                    # Decode and return list of (lat, lon) tuples
                     decoded_route = list(iter_decode(polyline_str))
-                    if not decoded_route: # Check if decoding yielded anything
+                    if not decoded_route: 
                          print("Warning: Polyline decoding resulted in empty list.")
                          return None
                     return decoded_route
-        # Return None if expected data is missing
         print("Warning: Polyline not found in HERE directions response.")
         return None
     except requests.exceptions.Timeout:
@@ -169,21 +142,15 @@ def get_here_directions(origin, destination, api_key):
          print(f"Error fetching HERE directions: {e}")
          return None
     except (ValueError, KeyError, IndexError, TypeError) as e:
-         # Catch potential errors during decoding or data access
          print(f"Error processing HERE directions data: {e}")
          return None
 
 
 def get_coordinates(city):
-    """Gets coordinates for a city using Nominatim (OSM)."""
-    # Keep this specific implementation as requested, despite inconsistency
     if not city: return None, None
     try:
-        # Using a generic user agent - consider defining a specific one in Config
-        # Ensure Config object is accessible or pass user agent string directly
         user_agent = getattr(Config, 'NOMINATIM_USER_AGENT', 'h2_route_app_v1')
         geolocator = Nominatim(user_agent=user_agent, timeout=10)
-        # Add ", UK" for better specificity if needed, but check if city names already include it
         query = city if "uk" in city.lower() else f"{city}, UK"
         location = geolocator.geocode(query, exactly_one=True)
         if location:
@@ -191,23 +158,17 @@ def get_coordinates(city):
         else:
             print(f"Warning: Nominatim could not geocode city: {city}")
             return None, None
-    except Exception as e: # Catch potential geopy errors like RateLimiter, etc.
+    except Exception as e: 
          print(f"Error during Nominatim geocoding for {city}: {e}")
          return None, None
 
 
-# --- REFACTORED FUNCTION (Optimized: Geocode Once) ---
 def find_nearest_stations(origin_city, station_cities, destination_city):
-    """
-    Finds nearest stations from a list based on custom distance/direction logic,
-    optimizing by geocoding each city only once.
-    """
-    print(f"Finding nearest stations: Origin={origin_city}, Dest={destination_city}") # Add logging
+    print(f"Finding nearest stations: Origin={origin_city}, Dest={destination_city}") 
     if not all([origin_city, station_cities, destination_city]):
          print("Warning: Missing input for find_nearest_stations")
          return []
 
-    # --- Step 1: Geocode Origin and Destination ---
     origin_coords = get_coordinates(origin_city)
     dest_coords = get_coordinates(destination_city)
 
@@ -217,21 +178,16 @@ def find_nearest_stations(origin_city, station_cities, destination_city):
     print(f"  Origin Coords: {origin_coords}")
     print(f"  Dest Coords: {dest_coords}")
 
-    # --- Step 2: Geocode all potential Station Cities ONCE ---
     station_coords_cache = {}
     print(f"  Geocoding {len(station_cities)} potential station cities...")
     for city in station_cities:
         coords = get_coordinates(city)
         if coords and coords[0] is not None:
             station_coords_cache[city] = coords
-        # Optional: Add short sleep if hitting Nominatim rate limits frequently
-        # time.sleep(0.5) # e.g., sleep half a second between calls
     print(f"  Geocoded {len(station_coords_cache)} cities successfully.")
 
-    # --- Step 3: Filter stations based on distance/direction using cached coords ---
-    valid_stations = {} # Store valid stations: {city_name: distance_from_origin}
+    valid_stations = {} 
 
-    # Determine general direction
     direction = "northbound" if dest_coords[0] > origin_coords[0] else "southbound"
     print(f"  Direction: {direction}")
 
@@ -239,32 +195,26 @@ def find_nearest_stations(origin_city, station_cities, destination_city):
         try:
             distance = geodesic(origin_coords, coords).miles
 
-            # Check distance criteria (within 40 OR within 150 and correct direction)
             is_close_enough = (distance <= 40)
             is_directional = False
-            # Check direction relative to origin latitude
             if distance <= 150:
-                 # Allow for slight variations or being exactly on the same latitude
-                 if direction == "northbound" and coords[0] >= origin_coords[0] - 0.01: # Small tolerance
+                 if direction == "northbound" and coords[0] >= origin_coords[0] - 0.01:
                      is_directional = True
-                 elif direction == "southbound" and coords[0] <= origin_coords[0] + 0.01: # Small tolerance
+                 elif direction == "southbound" and coords[0] <= origin_coords[0] + 0.01: 
                      is_directional = True
 
             if is_close_enough or is_directional:
                  valid_stations[city] = distance
-                 # print(f"  Keeping '{city}': Dist={distance:.1f} mi, Close={is_close_enough}, Directional={is_directional}") # Debug logging
 
-        except ValueError as e: # Catch potential errors from geodesic if coords are bad
+        except ValueError as e: 
              print(f"Warning: Could not calculate distance for {city}: {e}")
 
     if not valid_stations:
         print("  No valid stations found meeting criteria.")
         return []
 
-    # Sort the final list of valid stations by distance
     nearest_stations = sorted(valid_stations.items(), key=lambda item: item[1])
     print(f"  Found {len(nearest_stations)} nearest stations meeting criteria.")
     return nearest_stations
-# --- END REFACTORED FUNCTION ---
 
 

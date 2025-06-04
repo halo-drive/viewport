@@ -2,31 +2,26 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AppContext } from '../AppContext';
 import dieselPump from '../assets/diesel-pump.png';
 import hydrogenPump from '../assets/hydrogen-pump.png';
-import chargingStationIcon from '../assets/charging-station.png'; // You'll need to add this image asset
+import chargingStationIcon from '../assets/charging-station.png'; 
 import green from '../assets/green.png';
 import red from '../assets/red.png';
 
 export default function EnergyPanel() {
-  // Get AppContext for storing persistent data
   const { routeData, journeyProcessed, energyData, setEnergyData } = useContext(AppContext);
   
-  // Get fuel type from session storage
   const getCurrentFuelType = () => {
     try {
       return sessionStorage.getItem('currentFuelType') || 'Diesel';
     } catch (e) {
       console.error("Error accessing sessionStorage:", e);
-      return 'Diesel'; // Default to Diesel if error
+      return 'Diesel'; 
     }
   };
   
   const journeyFuelType = getCurrentFuelType();
   
-  // Generate or retrieve energy data
   useEffect(() => {
-    // Check if we already have energy data
     if (!energyData || !Object.keys(energyData).length) {
-      // Try to get station names from session storage
       let stationNames = [];
       try {
         const storedNames = sessionStorage.getItem('stationNames');
@@ -38,45 +33,34 @@ export default function EnergyPanel() {
         console.error("Error reading station names:", e);
       }
       
-      // Default station names if none found
       const dieselStationName = stationNames.length > 0 ? stationNames[0] : 'Central Depot Station';
       const hydrogenStationName = stationNames.length > 0 ? stationNames[0] : 'Hydrogen Hub Station';
       const electricStationName = stationNames.length > 0 ? stationNames[0] : 'EV Charging Hub';
       
-      // No data exists yet - generate new random data
-      // Random diesel level (100-1500 L)
       const randomDiesel = Math.floor(Math.random() * (1500 - 100 + 1)) + 100;
       
-      // Random hydrogen level (10-80 kg)
       const randomHydrogen = Math.floor(Math.random() * (80 - 10 + 1)) + 10;
       
-      // Random electric battery charge (10-95%)
       const randomBatteryCharge = Math.floor(Math.random() * (95 - 10 + 1)) + 10;
       
-      // Random available filling points (2-6)
       const availablePoints = Math.floor(Math.random() * (6 - 2 + 1)) + 2;
       
-      // Random hydrogen station data
       const compressionOptions = [14, 40, 80];
       const randomCompression = compressionOptions[Math.floor(Math.random() * compressionOptions.length)];
       const randomCapacity = Math.floor(Math.random() * (1000 - 500 + 1)) + 500;
       
-      // Random electric charging station data
       const chargingPowerOptions = [150, 250, 350, 500];
       const randomChargingPower = chargingPowerOptions[Math.floor(Math.random() * chargingPowerOptions.length)];
       const randomAvailableChargers = Math.floor(Math.random() * (8 - 1 + 1)) + 1;
       
-      // Random time for scheduled start
       const hours = Math.floor(Math.random() * 24);
       const minutes = Math.floor(Math.random() * 60);
       const scheduledStart = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
       
-      // Estimated finish (2-4 hours later)
       const finishHours = hours + Math.floor(Math.random() * (4 - 2 + 1)) + 2;
       const adjustedFinishHours = finishHours >= 24 ? finishHours - 24 : finishHours;
       const estimatedFinish = `${adjustedFinishHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
       
-      // Create and store the energy data
       const newEnergyData = {
         dieselLevel: randomDiesel,
         hydrogenLevel: randomHydrogen,
@@ -102,28 +86,24 @@ export default function EnergyPanel() {
         }
       };
       
-      // Store in context for persistence
       setEnergyData(newEnergyData);
     }
   }, [energyData, setEnergyData]);
 
-  // Helper function to get color for fuel level bar
   const getFuelBarColor = (level, max) => {
     const percentage = level / max;
     
-    if (percentage < 0.3) return '#e74c3c'; // Red for low
-    if (percentage < 0.6) return '#f39c12'; // Orange for medium
-    return '#2ecc71'; // Green for high
+    if (percentage < 0.3) return '#e74c3c'; 
+    if (percentage < 0.6) return '#f39c12'; 
+    return '#2ecc71'; 
   };
   
-  // If we don't have energy data yet, show loading
   if (!energyData) {
     return <div>Loading energy data...</div>;
   }
 
   return (
     <div className="energy-panel">
-      {/* Fuel Section */}
       <div className="energy-section">
         <h3 className="section-title">Fuel</h3>
         
@@ -178,7 +158,6 @@ export default function EnergyPanel() {
         )}
       </div>
       
-      {/* Stations Section */}
       <div className="energy-section">
         <h3 className="section-title">Station</h3>
         

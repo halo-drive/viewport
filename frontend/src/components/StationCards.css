@@ -4,13 +4,13 @@
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    flex-wrap: nowrap; /* Ensure cards stay in a single row */
+    flex-wrap: nowrap; 
     justify-content: center;
     gap: 15px;
     z-index: 500;
     width: auto;
     max-width: 95%;
-    overflow-x: auto; /* Allow horizontal scrolling if too many cards */
+    overflow-x: auto; 
     padding: 5px;
   }
     
@@ -56,15 +56,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
-  /* Fuel card specific styles */
-  
+    
   .fuel-card {
     background: rgba(255, 255, 255, 0.514);
     backdrop-filter: blur(5px);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    padding: 0 0 10px 0; /* Reduced top padding */
+    padding: 0 0 10px 0; 
     min-width: 280px;
     max-width: 320px;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -82,7 +80,6 @@
     z-index: 500;
   }
 
-  /* New styles for fuel value container with icon */
 .fuel-value-container {
   display: flex;
   align-items: center;
@@ -106,7 +103,6 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   }
 
-  /* Station Display */
   .station-display {
     background-color: rgba(158, 183, 230, 0.15);
     padding: 10px;
@@ -116,7 +112,6 @@
     font-size: 13px;
   }
     
-  /* Filling Points Display */
   .filling-points {
     display: flex;
     flex-direction: column;
@@ -158,7 +153,6 @@
     font-weight: 700;
   }
     
-  /* Hydrogen Station Details */
   .hydrogen-station-details {
     display: flex;
     flex-direction: column;
@@ -203,7 +197,6 @@
     color: #4e7aff;
   }
   
-  /* Single station card styles */
   .single-station-card-container {
     position: absolute;
     bottom: 50px;

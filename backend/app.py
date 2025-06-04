@@ -17,14 +17,15 @@ app = Flask(__name__)
 app.config.from_object(Config)  
 
 app.config['SESSION_COOKIE_NAME'] = 'viewport_session'
-app.config['SESSION_COOKIE_PATH'] = '/'  # Only accessible at root path
+app.config['SESSION_COOKIE_PATH'] = '/'  
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')
 
 # for dev only
 # !!!!!IMPORTANT!!!!!!!!
 # comment this out while pushing to github and production
-# CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+# there is another one at the bottom
+#CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 # !!!!IMPORTANT!!!!!!!
 
 def init_db():
@@ -77,16 +78,16 @@ def handle_exception(e):
     return "<h1>Internal Server Error</h1>", 500
 
 
-# --- API Status Route ---
-# Simple health check endpoint for the frontend or monitoring
+
+# Health check endpoint for the frontend
 @app.route('/api/status')
 def api_status():
     return jsonify({"status": "OK", "message": "API is running"})
-# ------------------------
 
 # for dev only
 # !!!!!IMPORTANT!!!!!!!!
 # comment this out while pushing to github and production
-# if __name__ == '__main__':
-#     app.run(host='0.0.0.0', port=443, debug=True)
+# don't forget the CORS one at the top
+#if __name__ == '__main__':
+#    app.run(host='0.0.0.0', port=443, debug=True)
 # !!!!!IMPORTANT!!!!!!!!

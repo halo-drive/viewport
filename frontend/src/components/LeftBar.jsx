@@ -17,7 +17,6 @@ export default function LeftBar() {
     setActivePane 
   } = useContext(AppContext);
 
-  // Handle clicks outside to close the pane
   useEffect(() => {
     function handleClickOutside(event) {
       if (paneRef.current && !paneRef.current.contains(event.target)) {
@@ -31,32 +30,25 @@ export default function LeftBar() {
     };
   }, [setActivePane]);
 
-  // State to track if energy cards are shown
   const [showEnergyCards, setShowEnergyCards] = useState(false);
 
   const togglePane = (paneName) => {
-    // Special handling for energy button
     if (paneName === "energy") {
       if (journeyProcessed) {
-        // Toggle energy cards visibility
         setShowEnergyCards(!showEnergyCards);
-        // Make sure the sliding pane is closed
         setActivePane(null);
       }
       return;
     }
     
-    // Only allow start pane if journey isn't processed yet
     if (!journeyProcessed && paneName !== "start") {
       return;
     }
     
-    // For other buttons, close energy cards if open
     if (showEnergyCards) {
       setShowEnergyCards(false);
     }
     
-    // Toggle the appropriate pane
     setActivePane(activePane === paneName ? null : paneName);
   };
 
@@ -108,7 +100,6 @@ export default function LeftBar() {
         <SlidingPanel />
       </div>
       
-      {/* Render energy station cards when showEnergyCards is true */}
       {showEnergyCards && journeyProcessed && <StationCards onClose={() => setShowEnergyCards(false)} />}
     </>
   );

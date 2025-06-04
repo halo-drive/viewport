@@ -3,38 +3,31 @@ import green from '../assets/green.png';
 import red from '../assets/red.png';
 import hydrogenPump from '../assets/hydrogen-pump.png';
 import dieselPump from '../assets/diesel-pump.png';
-import chargingStationIcon from '../assets/charging-station.png'; // Add this image asset
+import chargingStationIcon from '../assets/charging-station.png'; 
 import './StationCards.css';
 
-// Single station card component to display when a station marker is clicked
 const StationCard = ({ stationData, onClose }) => {
-  // Get the current fuel type from sessionStorage
   const getCurrentFuelType = () => {
     try {
       return sessionStorage.getItem('currentFuelType') || 'Diesel';
     } catch (e) {
       console.error("Error accessing sessionStorage:", e);
-      return 'Diesel'; // Default to Diesel if error
+      return 'Diesel'; 
     }
   };
   
   const fuelType = getCurrentFuelType();
   
-  // Set up click away listener to close card
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is outside of station card
       const stationCard = document.querySelector('.single-station-card');
       if (stationCard && !stationCard.contains(event.target)) {
-        // If click is outside, call the onClose function
         onClose();
       }
     };
     
-    // Add the event listener
     document.addEventListener('mousedown', handleClickOutside);
     
-    // Clean up
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -42,7 +35,6 @@ const StationCard = ({ stationData, onClose }) => {
   
   if (!stationData) return null;
   
-  // Get the appropriate icon based on fuel type
   const getStationIcon = () => {
     if (fuelType === 'Electric') {
       return chargingStationIcon;
